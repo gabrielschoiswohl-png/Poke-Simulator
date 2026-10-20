@@ -3180,7 +3180,6 @@ function closeBattle() {
   // 💾 SPEICHERN & LADEN
   // ==========================================
   const SAVE_KEY = "pokeSimulatorSpielstand";
-  let lastSavedJson = "";
 
   // Liest den aktuellen Stand aller Spieler und Pokémon aus
   function getGameState() {
@@ -3229,40 +3228,69 @@ function closeBattle() {
         });
   }
 
-  // Automatisch im Browser speichern (bleibt am iPad auch nach dem Schließen erhalten)
-  function autoSave() {
-        const json = JSON.stringify(getGameState());
-        if (json === lastSavedJson) return;
-        try { localStorage.setItem(SAVE_KEY, json); lastSavedJson = json; } catch (e) {}
-  }
-
   function resetGame() {
-        if (!confirm("Wirklich alles zurücksetzen? Alle Spieler und Pokémon werden gelöscht.")) return;
-        try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
-        lastSavedJson = "";
+        if (!confirm("Wirklich zurücksetzen? Alle Spieler und Pokémon auf dem Bildschirm werden gelöscht. Dein gespeicherter Spielstand bleibt erhalten.")) return;
         document.getElementById('board').innerHTML = "";
         players = [];
         for(let i=0; i<4; i++) createPlayer();
   }
 
-  // Spielstand als Code (zum Sichern oder auf ein anderes Gerät übertragen)
-  function saveBattleState() {
-        const exportCode = btoa(unescape(encodeURIComponent(JSON.stringify(getGameState()))));
-        const overlay = document.createElement('div');
-        overlay.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:9999; display:flex; align-items:center; justify-content:center; flex-direction:column; padding:20px;";
-        overlay.innerHTML = `
-            <div style="background:#2d2d2d; padding:20px; border-radius:15px; width:100%; max-width:400px; text-align:center; border:2px solid #27ae60;">
-                <h3 style="color:#27ae60;">Spielstand-Code</h3>
-                <p style="font-size:14px;">Das Spiel speichert automatisch. Diesen Code brauchst du nur als Sicherung oder für ein anderes Gerät.</p>
-                <textarea id="saveCode" style="width:100%; height:100px; background:#111; color:#27ae60; border:none; padding:10px;">${exportCode}</textarea>
-                <button onclick="this.parentElement.parentElement.remove()" style="margin-top:15px; width:100%; padding:10px; background:#27ae60; border:none; color:white; border-radius:5px;">Fertig</button>
-            </div>
-        `;
-        document.body.appendChild(overlay);
-        document.getElementById('saveCode').select();
+  function closeSaveOverlay() {
+        const o = document.getElementById('saveOverlay');
+        if (o) o.remove();
   }
 
+  function showSaveOverlay(html) {
+        closeSaveOverlay();
+        const overlay = document.createElement('div');
+        overlay.id = 'saveOverlay';
+        overlay.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:9999; display:flex; align-items:center; justify-content:center; flex-direction:column; padding:20px; box-sizing:border-box;";
+        overlay.innerHTML = `<div style="background:#2d2d2d; padding:20px; border-radius:15px; width:100%; max-width:400px; text-align:center; border:2px solid #27ae60;">${html}
+            <button onclick="closeSaveOverlay()" style="margin-top:15px; width:100%; padding:12px; background:#444; border:none; color:white; border-radius:8px;">Schließen</button></div>`;
+        document.body.appendChild(overlay);
+  }
+
+  function getSavedGame() {
+        try { return JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { return null; }
+  }
+
+  // 💾 Speichern: nur wenn du auf den Knopf tippst, am iPad gespeichert
+  function saveBattleState() {
+        const gameState = getGameState();
+        gameState.savedAt = new Date().toLocaleString('de-AT');
+        let ok = true;
+        try { localStorage.setItem(SAVE_KEY, JSON.stringify(gameState)); } catch (e) { ok = false; }
+        delete gameState.savedAt;
+        const exportCode = btoa(unescape(encodeURIComponent(JSON.stringify(gameState))));
+        showSaveOverlay(`
+            <h3 style="color:#27ae60;">${ok ? "✅ Gespeichert!" : "⚠️ Speichern am iPad nicht möglich"}</h3>
+            <p style="font-size:14px;">${ok ? "Mit 📂 Laden holst du diesen Stand jederzeit zurück." : "Kopiere dir diesen Code, um den Stand zu sichern."}</p>
+            <p style="font-size:13px; color:#aaa;">Code als Sicherung oder für ein anderes Gerät:</p>
+            <textarea style="width:100%; height:80px; background:#111; color:#27ae60; border:none; padding:10px; box-sizing:border-box;">${exportCode}</textarea>`);
+  }
+
+  // 📂 Laden: gespeicherten Stand vom iPad oder einen Code laden
   function loadBattleState() {
+        const saved = getSavedGame();
+        const savedButton = (saved && saved.players)
+            ? `<button onclick="loadSavedGame()" style="width:100%; padding:15px; background:#27ae60; border:none; color:white; border-radius:8px; font-weight:bold;">Gespeicherten Stand laden<br><small>${saved.savedAt || ""}</small></button>`
+            : `<p style="font-size:14px;">Noch kein Spielstand gespeichert.</p>`;
+        showSaveOverlay(`
+            <h3 style="color:#2980b9;">📂 Laden</h3>
+            ${savedButton}
+            <button onclick="loadFromCode()" style="margin-top:10px; width:100%; padding:12px; background:#2980b9; border:none; color:white; border-radius:8px;">Code einfügen</button>`);
+  }
+
+  function loadSavedGame() {
+        const saved = getSavedGame();
+        closeSaveOverlay();
+        if (!saved) return;
+        applyGameState(saved);
+        showToast("Spielstand geladen!");
+  }
+
+  function loadFromCode() {
+        closeSaveOverlay();
         const importCode = prompt("Füge hier deinen Spielstand-Code ein:");
         if (!importCode) return;
         let gameState;
@@ -3273,23 +3301,11 @@ function closeBattle() {
             return alert("Fehler beim Laden: Der Code ist ungültig.");
         }
         applyGameState(gameState);
-        autoSave();
         showToast("Spielstand geladen!");
   }
 
     window.onload = () => { 
-        let saved = null;
-        try { saved = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) {}
-        if (saved && saved.players && saved.players.length) {
-            applyGameState(saved);
-            lastSavedJson = JSON.stringify(getGameState());
-            showToast("Spielstand wiederhergestellt");
-        } else {
-            for(let i=0; i<4; i++) createPlayer(); 
-        }
-        setInterval(autoSave, 2000);
-        document.addEventListener('visibilitychange', autoSave);
-        window.addEventListener('pagehide', autoSave);
+        for(let i=0; i<4; i++) createPlayer(); 
     };
 </script> 
 </body> 
