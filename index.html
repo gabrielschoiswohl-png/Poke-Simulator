@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"> 
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="Poke-Sim">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Bangers&display=swap" rel="stylesheet">
     <title>PKMN Tracker - Battle Edition</title> 
     <style> 
         :root { 
@@ -117,6 +119,40 @@
         .evolving-pokemon {
             animation: evoBlink 3.5s ease-in-out;
         }
+        /* ==========================================
+           🎨 TREFFER-MELDUNG GESTALTEN
+           Hier kannst du Schrift, Farben und Größe der
+           Meldung nach einem Angriff (MISS / Schaden / CRIT) ändern.
+           ========================================== */
+        :root {
+            --hit-font: 'Bangers', 'Impact', sans-serif;  /* Schriftart */
+            --hit-size: 72px;            /* Schriftgröße der Hauptzeile */
+            --hit-sub-size: 28px;        /* Schriftgröße der Zusatzzeile (z. B. "Sehr effektiv!") */
+            --hit-outline: #000;         /* Umrandung der Schrift */
+            --hit-color: #ffffff;        /* Farbe bei normalem Treffer */
+            --crit-color: #f1c40f;       /* Farbe bei CRIT */
+            --miss-color: #95a5a6;       /* Farbe bei MISS */
+            --hit-duration: 1.6s;        /* Wie lange die Meldung sichtbar ist */
+        }
+        #hitPopup { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; z-index: 7000; pointer-events: none; font-family: var(--hit-font); text-align: center; letter-spacing: 2px; }
+        #hitPopup .hit-main { font-size: var(--hit-size); color: var(--hit-color); -webkit-text-stroke: 3px var(--hit-outline); paint-order: stroke fill; text-shadow: 0 6px 0 rgba(0,0,0,0.5); }
+        #hitPopup .hit-sub { font-size: var(--hit-sub-size); color: white; -webkit-text-stroke: 2px var(--hit-outline); paint-order: stroke fill; margin-top: 8px; }
+        #hitPopup.crit .hit-main { color: var(--crit-color); font-size: calc(var(--hit-size) * 1.2); }
+        #hitPopup.miss .hit-main { color: var(--miss-color); }
+        #hitPopup.show { display: flex; animation: hitPop var(--hit-duration) ease-out forwards; }
+        #hitPopup.crit.show .hit-main { animation: hitShake 0.4s ease-in-out 2; }
+        @keyframes hitPop {
+            0% { transform: scale(0.2); opacity: 0; }
+            15% { transform: scale(1.25); opacity: 1; }
+            25% { transform: scale(1); }
+            80% { opacity: 1; }
+            100% { transform: translateY(-40px); opacity: 0; }
+        }
+        @keyframes hitShake {
+            0%, 100% { transform: translateX(0) rotate(0); }
+            25% { transform: translateX(-8px) rotate(-3deg); }
+            75% { transform: translateX(8px) rotate(3deg); }
+        }
     </style> 
 </head> 
 <body> 
@@ -128,6 +164,7 @@
 <button class="btn-battle-main" onclick="openBattleSetup()">⚔️ KAMPF STARTEN</button> 
 
 <div id="battleToast"></div>
+<div id="hitPopup"><div class="hit-main"></div><div class="hit-sub"></div></div>
 
 <div id="battleOverlay"> 
     <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 5px;"> 
@@ -2432,6 +2469,18 @@ let players = [], poolP1 = [], poolP2 = [], activeP1 = null, activeP2 = null, ba
   let lastDmgP1 = 0; // Speichert Schaden, den P1 erhalten hat
   let lastDmgP2 = 0; // Speichert Schaden, den P2 erhalten hat
 
+    function showHitPopup(mainText, subText, kind) {
+        const popup = document.getElementById('hitPopup');
+        popup.querySelector('.hit-main').innerText = mainText;
+        popup.querySelector('.hit-sub').innerText = subText || "";
+        popup.className = kind || "";
+        void popup.offsetWidth; // Animation neu starten
+        popup.classList.add('show');
+        clearTimeout(popup.hideTimer);
+        const duration = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hit-duration')) || 1.6;
+        popup.hideTimer = setTimeout(() => { popup.className = ""; }, duration * 1000);
+    }
+
     function showToast(msg) {
         const toast = document.getElementById('battleToast'); toast.innerText = msg; toast.style.display = 'block';
         setTimeout(() => { toast.style.display = 'none'; }, 2000);
@@ -2690,7 +2739,7 @@ function dittoTransform(side) {
     function processHit(type) { 
         if(type === 'miss') { 
             if(multiHitCount > 0) showDiceSelection();
-            else { document.getElementById('diceModal').style.display='none'; endTurn(); }
+            else { document.getElementById('diceModal').style.display='none'; showHitPopup("MISS!", "", "miss"); endTurn(); }
             return; 
         } 
         multiHitCount++;
@@ -2852,9 +2901,16 @@ if (isPoisonAttack && !isImmune) {
     hpBox.innerText = newHp; 
     document.getElementById('diceModal').style.display = 'none'; 
 
-    if (isImmune) showToast("Hat keine Wirkung!");
-    else if (effectivenessValue > 0) showToast("Es ist sehr effektiv!");
-    else if (effectivenessValue < 0) showToast("Nicht sehr effektiv...");
+    // Treffer-Meldung (Aussehen oben im Abschnitt "TREFFER-MELDUNG GESTALTEN")
+    if (!(chosenAtk && chosenAtk.effect === "heal" && chosenAtk.d === 0)) {
+        let subText = "";
+        if (isImmune) subText = "Hat keine Wirkung!";
+        else if (effectivenessValue > 0) subText = "Sehr effektiv!";
+        else if (effectivenessValue < 0) subText = "Nicht sehr effektiv...";
+        if (multiHitCount > 1) subText = multiHitCount + "x getroffen! " + subText;
+        const isCrit = totalCritBonus > 0;
+        showHitPopup((isCrit ? "CRIT " : "") + totalDamage + " Schaden!", subText, isCrit ? "crit" : "");
+    }
 
     // 8. Heilungs-/Drain-Logik
     // Kein Heilen im letzten Widerstand (Angreifer hat 0 KP), da entscheidet nur der Schaden
