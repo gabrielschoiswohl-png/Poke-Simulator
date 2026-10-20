@@ -3305,7 +3305,14 @@ function closeBattle() {
   }
 
     window.onload = () => { 
-        for(let i=0; i<4; i++) createPlayer(); 
+        // Beim Öffnen den zuletzt gespeicherten Stand laden (gespeichert wird nur per 💾-Knopf)
+        const saved = getSavedGame();
+        if (saved && saved.players && saved.players.length) {
+            applyGameState(saved);
+            showToast("Gespeicherter Stand geladen" + (saved.savedAt ? " (" + saved.savedAt + ")" : ""));
+        } else {
+            for(let i=0; i<4; i++) createPlayer(); 
+        }
     };
 </script> 
 </body> 
