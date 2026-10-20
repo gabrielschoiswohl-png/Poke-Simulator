@@ -228,7 +228,7 @@
 
 <div class="footer"> 
     <button onclick="createPlayer()" style="flex:1; background:var(--success); padding:15px; border-radius:10px; color:white; border:none; font-weight:bold;">+ SPIELER</button> 
-    <button onclick="location.reload()" style="flex:1; background:#333; padding:15px; border-radius:10px; color:white; border:none; font-weight:bold;">RESET</button> 
+    <button onclick="resetGame()" style="flex:1; background:#333; padding:15px; border-radius:10px; color:white; border:none; font-weight:bold;">RESET</button> 
 </div> 
 
 <script> 
@@ -3176,93 +3176,120 @@ function closeBattle() {
         });
     }
 
-  function saveBattleState() {
-        const saveName = prompt("Wie soll der Spielstand heißen?", "Spielstand " + new Date().toLocaleTimeString());
-        if (!saveName) return;
+  // ==========================================
+  // 💾 SPEICHERN & LADEN
+  // ==========================================
+  const SAVE_KEY = "pokeSimulatorSpielstand";
+  let lastSavedJson = "";
 
-        const playerContainers = document.querySelectorAll('.player-col');
-        
-        const gameState = {
-            players: Array.from(playerContainers).map(container => {
-                return {
-                    // Spielername speichern (das Input-Feld über den Karten)
-                    playerName: container.querySelector('input') ? container.querySelector('input').value : "Spieler",
-                    cards: Array.from(container.querySelectorAll('.pkmn-card')).map(card => ({
-                        name: card.querySelector('input').value,
-                        hp: card.querySelector('.hp-box').innerText,
-                        maxhp: card.dataset.maxhp,
-                        stage: card.dataset.stage,
-                        wins: card.dataset.wins, // Hier werden die Siege gespeichert
-                        kat: card.dataset.kat,
-                        poisoned: card.dataset.poisoned,
-                        icon: card.querySelector('.pkmn-icon-small').src
-                    }))
-                };
-            })
+  // Liest den aktuellen Stand aller Spieler und Pokémon aus
+  function getGameState() {
+        return {
+            players: Array.from(document.querySelectorAll('.player-col')).map(container => ({
+                playerName: container.querySelector('input').value,
+                cards: Array.from(container.querySelectorAll('.pkmn-card')).map(card => ({
+                    name: card.querySelector('input').value,
+                    hp: card.querySelector('.hp-box').innerText,
+                    maxhp: card.dataset.maxhp,
+                    stage: card.dataset.stage,
+                    wins: card.dataset.wins,
+                    kat: card.dataset.kat,
+                    poisoned: card.dataset.poisoned,
+                    icon: card.querySelector('.pkmn-icon-small').src
+                }))
+            }))
         };
+  }
 
-        const exportCode = btoa(JSON.stringify(gameState));
+  // Baut alle Spieler und Pokémon aus einem Spielstand neu auf
+  function applyGameState(gameState) {
+        document.getElementById('board').innerHTML = "";
+        players = [];
+        gameState.players.forEach(playerData => {
+            createPlayer();
+            const col = document.getElementById(players[players.length - 1].id);
+            col.querySelector('input').value = playerData.playerName;
+            col.querySelector('.pkmn-list').innerHTML = "";
+            playerData.cards.forEach(data => {
+                addPkmn(col.id);
+                const cards = col.querySelectorAll('.pkmn-card');
+                const card = cards[cards.length - 1];
+                card.querySelector('input').value = data.name;
+                card.querySelector('.hp-box').innerText = data.hp;
+                card.dataset.maxhp = data.maxhp;
+                card.dataset.stage = data.stage;
+                card.dataset.wins = data.wins;
+                card.dataset.kat = data.kat;
+                card.dataset.poisoned = data.poisoned || "false";
+                card.querySelector('.pkmn-icon-small').src = data.icon;
+                card.querySelector('.stage-tag').innerText = "S" + data.stage;
+                const winsNeeded = getWinsNeeded(data.name, parseInt(data.stage)) || 2;
+                card.querySelector('.win-fill').style.width = Math.min(100, (parseInt(data.wins) / winsNeeded) * 100) + "%";
+            });
+        });
+  }
+
+  // Automatisch im Browser speichern (bleibt am iPad auch nach dem Schließen erhalten)
+  function autoSave() {
+        const json = JSON.stringify(getGameState());
+        if (json === lastSavedJson) return;
+        try { localStorage.setItem(SAVE_KEY, json); lastSavedJson = json; } catch (e) {}
+  }
+
+  function resetGame() {
+        if (!confirm("Wirklich alles zurücksetzen? Alle Spieler und Pokémon werden gelöscht.")) return;
+        try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
+        lastSavedJson = "";
+        document.getElementById('board').innerHTML = "";
+        players = [];
+        for(let i=0; i<4; i++) createPlayer();
+  }
+
+  // Spielstand als Code (zum Sichern oder auf ein anderes Gerät übertragen)
+  function saveBattleState() {
+        const exportCode = btoa(unescape(encodeURIComponent(JSON.stringify(getGameState()))));
         const overlay = document.createElement('div');
         overlay.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:9999; display:flex; align-items:center; justify-content:center; flex-direction:column; padding:20px;";
         overlay.innerHTML = `
             <div style="background:#2d2d2d; padding:20px; border-radius:15px; width:100%; max-width:400px; text-align:center; border:2px solid #27ae60;">
-                <h3 style="color:#27ae60;">Spielstand gespeichert!</h3>
+                <h3 style="color:#27ae60;">Spielstand-Code</h3>
+                <p style="font-size:14px;">Das Spiel speichert automatisch. Diesen Code brauchst du nur als Sicherung oder für ein anderes Gerät.</p>
                 <textarea id="saveCode" style="width:100%; height:100px; background:#111; color:#27ae60; border:none; padding:10px;">${exportCode}</textarea>
                 <button onclick="this.parentElement.parentElement.remove()" style="margin-top:15px; width:100%; padding:10px; background:#27ae60; border:none; color:white; border-radius:5px;">Fertig</button>
             </div>
         `;
         document.body.appendChild(overlay);
         document.getElementById('saveCode').select();
-    }
+  }
 
-    function loadBattleState() {
+  function loadBattleState() {
         const importCode = prompt("Füge hier deinen Spielstand-Code ein:");
         if (!importCode) return;
-
+        let gameState;
         try {
-            const gameState = JSON.parse(atob(importCode));
-            const playerContainers = document.querySelectorAll('.player-col');
-            
-            gameState.players.forEach((playerData, index) => {
-                const container = playerContainers[index];
-                if (container) {
-                    // Spielernamen wiederherstellen
-                    if (container.querySelector('input')) container.querySelector('input').value = playerData.playerName;
-                    
-                    const cards = container.querySelectorAll('.pkmn-card');
-                    playerData.cards.forEach((data, i) => {
-                        if (cards[i]) {
-                            cards[i].querySelector('input').value = data.name;
-                            cards[i].querySelector('.hp-box').innerText = data.hp;
-                            cards[i].dataset.maxhp = data.maxhp;
-                            cards[i].dataset.stage = data.stage;
-                            cards[i].dataset.wins = data.wins; // Siege wiederherstellen
-                            cards[i].dataset.kat = data.kat;
-                            cards[i].dataset.poisoned = data.poisoned;
-                            cards[i].querySelector('.pkmn-icon-small').src = data.icon;
-                            cards[i].querySelector('.stage-tag').innerText = "S" + data.stage;
-                            // Sieg-Balken visuell aktualisieren
-                    const loadedDb = pokemonDB[data.name];
-                    const loadedLevelWins =
-                    (loadedDb && loadedDb.levelWins)
-                    ? loadedDb.levelWins
-                    : [2, 2, 2];
-
-                     const loadedWinsNeeded = loadedLevelWins[parseInt(data.stage) - 1];
-
-                     cards[i].querySelector('.win-fill').style.width =
-                     Math.min(100, (parseInt(data.wins) / loadedWinsNeeded) * 100) + "%";
-                        }
-                    });
-                }
-            });
-            showToast("Spielstand geladen!");
+            const raw = atob(importCode.trim());
+            try { gameState = JSON.parse(decodeURIComponent(escape(raw))); } catch (e) { gameState = JSON.parse(raw); }
         } catch (e) {
-            alert("Fehler beim Laden: Der Code ist ungültig.");
+            return alert("Fehler beim Laden: Der Code ist ungültig.");
         }
-    }
+        applyGameState(gameState);
+        autoSave();
+        showToast("Spielstand geladen!");
+  }
+
     window.onload = () => { 
-        for(let i=0; i<4; i++) createPlayer(); 
+        let saved = null;
+        try { saved = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) {}
+        if (saved && saved.players && saved.players.length) {
+            applyGameState(saved);
+            lastSavedJson = JSON.stringify(getGameState());
+            showToast("Spielstand wiederhergestellt");
+        } else {
+            for(let i=0; i<4; i++) createPlayer(); 
+        }
+        setInterval(autoSave, 2000);
+        document.addEventListener('visibilitychange', autoSave);
+        window.addEventListener('pagehide', autoSave);
     };
 </script> 
 </body> 
