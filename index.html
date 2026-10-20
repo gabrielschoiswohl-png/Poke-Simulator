@@ -1,0 +1,3213 @@
+<!DOCTYPE html> 
+<html lang="de"> 
+<head> 
+    <meta charset="UTF-8"> 
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"> 
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Poke-Sim">
+    <title>PKMN Tracker - Battle Edition</title> 
+    <style> 
+        :root { 
+            --accent: #2a75bb; 
+            --bg: #1a1a1a; 
+            --card: #2d2d2d; 
+            --win: #f1c40f; 
+            --danger: #e74c3c; 
+            --success: #27ae60; 
+            --active: #3498db; 
+        } 
+    
+        body { font-family: sans-serif; background: var(--bg); color: white; margin: 10px; padding-bottom: 140px; } 
+          /* Das Grund-Grid: Standardmäßig einspaltig (für iPhone) */
+.grid { 
+    display: grid; 
+    grid-template-columns: 1fr; 
+    gap: 15px; 
+    justify-items: center; 
+    padding: 10px;
+    width: 100%;
+}
+
+/* iPad-Ansicht: Hier erzwingen wir 2 Spalten */
+@media (min-width: 768px) {
+    .grid { 
+        grid-template-columns: repeat(2, 1fr); /* Genau 2 Spalten */
+        max-width: 1200px; /* Verhindert, dass es auf riesigen Bildschirmen zu breit wird */
+        margin: 0 auto;
+    }
+}
+
+/* Die Spieler-Karte soll im Grid immer voll ausgefüllt sein */
+.player-col { 
+    background: #2d2d2d; 
+    border: 1px solid #444; 
+    border-radius: 12px; 
+    padding: 10px; 
+    width: 100%; /* Wichtig: Füllt die Grid-Zelle aus */
+    max-width: 450px; /* Damit es auf dem iPad nicht zu gestreckt aussieht */
+    box-sizing: border-box;
+}
+        .team-ctrl { display: flex; gap: 8px; margin-top: 12px; } 
+        .btn-add-pkmn, .btn-team-heal { flex: 1; border: none; padding: 10px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 11px; color: white; } 
+        .btn-add-pkmn { background: #3498db; } 
+        .btn-team-heal { background: #27ae60; } 
+        .del-btn { position: absolute; top: 5px; right: 5px; background: rgba(231, 76, 60, 0.2); color: #e74c3c; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; width: 22px; height: 22px; font-size: 14px; z-index: 10; display: flex; align-items: center; justify-content: center; } 
+
+        .pkmn-card { background: #3d3d3d; border-radius: 10px; padding: 10px; margin-bottom: 10px; border: 1px solid #555; position: relative; } 
+        .pkmn-icon-small { height: 45px; vertical-align: middle; margin-right: 10px; image-rendering: pixelated; } 
+        .search-results { position: absolute; top: 100%; left: 0; right: 0; background: #444; border: 1px solid #666; z-index: 100; max-height: 150px; overflow-y: auto; display: none; } 
+        .search-item { padding: 8px; border-bottom: 1px solid #555; cursor: pointer; display: flex; align-items: center; } 
+
+        .win-track { width: 100%; height: 6px; background: #111; border-radius: 3px; margin: 5px 0; overflow: hidden; } 
+        .win-fill { height: 100%; background: var(--win); width: 0%; transition: width 0.3s; } 
+        .hp-box { background: #000; color: #2ecc71; border: 2px solid #2ecc71; padding: 5px; border-radius: 8px; font-size: 22px; font-weight: bold; text-align: center; width: 70px; } 
+
+        .hp-bar-container { width: 100%; height: 12px; background: #444; border-radius: 6px; border: 1px solid #000; margin: 8px 0; overflow: hidden; }
+        .hp-bar-fill { height: 100%; width: 100%; transition: width 0.4s ease, background-color 0.3s; background-color: var(--success); }
+
+        .btn-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin-top: 10px; } 
+        .btn-action { border: none; border-radius: 6px; color: white; font-weight: bold; font-size: 9px; padding: 5px 0; cursor: pointer; min-height: 50px; display: flex; flex-direction: column; align-items: center; justify-content: center; } 
+        .btn-action img { width: 22px; height: 22px; margin-bottom: 2px; }
+        .potion { background: #6c5ce7; } .super { background: #fd9644; } .hyper { background: #ff78ae; } .revive { background: #d4ac0d; } .max-revive { background: #c0392b; }
+
+        #battleOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #111; z-index: 3000; display: none; flex-direction: column; padding: 15px; box-sizing: border-box; overflow-y: auto; } 
+        .battle-arena { display: flex; flex-direction: column; gap: 8px; align-items: center; } 
+        .fighter-slot { background: #222; padding: 15px; border-radius: 15px; border: 3px solid #444; width: 100%; max-width: 320px; text-align: center; position: relative; min-height: 160px; transition: 0.3s; } 
+        .is-attacker { border-color: var(--active) !important; box-shadow: 0 0 15px var(--active); } 
+        .is-target { border-color: var(--danger) !important; box-shadow: 0 0 15px var(--danger); } 
+        .is-waiting { opacity: 0.4; filter: grayscale(0.7); pointer-events: none; }
+        .death-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); border-radius: 12px; display: flex; justify-content: center; align-items: center; color: var(--danger); font-size: 100px; font-weight: bold; z-index: 20; pointer-events: none; } 
+        
+        .team-balls { display: flex; gap: 8px; justify-content: center; margin: 8px 0; } 
+        .pkball-icon { width: 20px; height: 20px; image-rendering: pixelated; } 
+        .pkball-icon.fainted { filter: grayscale(1) brightness(0.5); opacity: 0.6; } 
+
+        .btn-switch-arena, .btn-item-arena { color: white; border: 1px solid white; border-radius: 8px; padding: 12px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 14px; } 
+        .btn-switch-arena { background: #2980b9; } 
+        .btn-item-arena { background: var(--success); }
+
+        #switchMenu, #itemMenu { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 5000; display: none; flex-direction: column; padding: 20px; box-sizing: border-box; } 
+        .switch-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; } 
+        .switch-card { background: #333; padding: 15px; border-radius: 10px; text-align: center; border: 2px solid #555; } 
+        
+        #diceModal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #333; border: 2px solid var(--win); border-radius: 15px; padding: 20px; z-index: 4000; display: none; width: 85%; max-width: 320px; text-align: center; } 
+        .dice-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 15px; } 
+        .dice-btn { background: #555; border: 1px solid #888; color: white; padding: 12px 5px; border-radius: 8px; font-weight: bold; cursor: pointer; } 
+        .atk-btn { background: #444; border: 1px solid #666; color: white; border-radius: 4px; padding: 5px; font-size: 11px; cursor: pointer; height: 50px; } 
+        .atk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 8px; } 
+        
+        #battleToast { position: fixed; top: 20%; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.85); color: white; padding: 12px 25px; border-radius: 25px; border: 2px solid var(--win); font-weight: bold; z-index: 6000; display: none; text-align: center; pointer-events: none; }
+
+        .btn-battle-main { position: fixed; bottom: 85px; left: 50%; transform: translateX(-50%); width: 90%; background: var(--danger); color: white; padding: 18px; border-radius: 35px; border: 2px solid white; font-weight: bold; z-index: 1000; font-size: 16px; } 
+        .footer { position: fixed; bottom: 0; left: 0; width: 100%; background: #000; padding: 12px; display: flex; gap: 10px; box-sizing: border-box; } 
+        .stage-tag { background:#e67e22; padding:2px 6px; border-radius:4px; font-size:12px; font-weight:bold; } 
+        
+        #hitCounterDisplay { position: absolute; top: 10px; right: 15px; color: var(--danger); font-size: 24px; font-weight: bold; }
+        .poisoned { border: 3px solid #9b59b6 !important; box-shadow: 0 0 15px #9b59b6 !important; }
+        .poison-tag { background: #9b59b6; color: white; font-size: 10px; padding: 2px 5px; border-radius: 4px; margin-left: 5px; }
+        #turnIndicator { text-align: center; color: var(--win); font-weight: bold; margin-bottom: 5px; font-size: 18px; text-transform: uppercase; letter-spacing: 1px; }
+      /* --- AB HIER NEUE EVOLUTIONS-ANIMATION --- */
+        @keyframes evoBlink {
+            0% { opacity: 1; transform: scale(1); filter: brightness(1); }
+            25% { opacity: 0; transform: scale(1.15); }
+            50% { opacity: 1; transform: scale(1.3); filter: brightness(2.5); }
+            75% { opacity: 0; transform: scale(1.15); }
+            100% { opacity: 1; transform: scale(1); filter: brightness(1); }
+        }
+        .evolving-pokemon {
+            animation: evoBlink 3.5s ease-in-out;
+        }
+    </style> 
+</head> 
+<body> 
+<div style="display: flex; justify-content: center; gap: 10px; margin: 15px; padding: 10px; background: #2d2d2d; border-radius: 12px; border: 1px solid #444;">
+    <button onclick="saveBattleState()" style="background: #27ae60; color: white; padding: 10px 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; flex: 1; max-width: 150px;">💾 Speichern</button>
+    <button onclick="loadBattleState()" style="background: #2980b9; color: white; padding: 10px 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; flex: 1; max-width: 150px;">📂 Laden</button>
+</div>
+<div id="board" class="grid"></div> 
+<button class="btn-battle-main" onclick="openBattleSetup()">⚔️ KAMPF STARTEN</button> 
+
+<div id="battleToast"></div>
+
+<div id="battleOverlay"> 
+    <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 5px;"> 
+        <h2 style="margin:0; color:var(--win);">ARENA</h2> 
+        <button onclick="closeBattle()" style="background:none; border:none; color:white; font-size:32px;">&times;</button> 
+    </div> 
+    <div id="turnIndicator">P1 STARTET</div>
+    <div id="setupView"> 
+        <p>Modus: <select id="modeSel" style="background:#333; color:white; border:1px solid #555; padding:5px;"><option value="1">1 vs 1</option><option value="2">2 vs 2</option><option value="3">3 vs 3</option><option value="6">6 vs 6</option></select></p> 
+        <p>P1: <select id="p1Sel" style="background:#333; color:white; border:1px solid #555; padding:5px; width:60%;"></select></p> 
+        <p>P2: <select id="p2Sel" style="background:#333; color:white; border:1px solid #555; padding:5px; width:60%;"></select></p> 
+        <button onclick="goToPkmnSelection()" style="width:100%; background:var(--accent); padding:16px; color:white; border:none; border-radius:8px; font-weight:bold; margin-top:20px;">WEITER</button> 
+    </div> 
+    <div id="pkmnSelectView" style="display:none;"> 
+        <div id="p1PkmnSelect" class="grid" style="gap:8px; margin-bottom:20px;"></div> 
+        <div id="p2PkmnSelect" class="grid" style="gap:8px;"></div> 
+        <button onclick="startFight()" style="width:100%; background:var(--success); padding:16px; color:white; border:none; border-radius:8px; font-weight:bold; margin-top:25px;">LOS!</button> 
+    </div> 
+    <div id="fightView" style="display:none;"> 
+        <div class="battle-arena"> 
+            <div id="teamBallsP2" class="team-balls"></div> 
+            <div id="slotP2" class="fighter-slot"></div> 
+            <div style="color:var(--win); font-weight:bold; font-size: 24px;">VS</div> 
+            <div id="slotP1" class="fighter-slot"></div> 
+            <div id="teamBallsP1" class="team-balls"></div> 
+        </div> 
+    </div> 
+</div> 
+
+<div id="switchMenu"> 
+    <h2 style="text-align:center;">🔄 Wechseln</h2> 
+    <div id="switchGrid" class="switch-grid"></div> 
+    <button onclick="document.getElementById('switchMenu').style.display='none'" id="cancelSwitch" style="margin-top:25px; width:100%; padding:15px; background:#444; border:none; color:white; border-radius:8px;">Abbrechen</button> 
+</div> 
+
+<div id="itemMenu">
+    <h2 style="text-align:center; color: var(--success);">🧪 Items nutzen</h2>
+    <div id="itemGrid" class="btn-grid" style="grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 20px;"></div>
+    <button onclick="document.getElementById('itemMenu').style.display='none'" style="margin-top:25px; width:100%; padding:15px; background:#444; border:none; color:white; border-radius:8px;">Abbrechen</button>
+</div>
+
+<div id="diceModal"> 
+    <div id="hitCounterDisplay"></div>
+    <h3 id="diceTitle">Schadenswurf</h3> 
+    <div id="hitSelection" style="display:flex; gap:8px; margin-top:15px;"> 
+        <button class="dice-btn" style="background:var(--danger); flex:1;" onclick="processHit('miss')">MISS</button> 
+        <button class="dice-btn" style="background:var(--success); flex:1;" onclick="processHit('hit')">HIT</button> 
+        <button class="dice-btn" style="background:var(--win); color:black; flex:1;" onclick="processHit('crit')">CRIT</button> 
+    </div> 
+    <div id="diceSelection" style="display:none;"> 
+        <div class="dice-grid"> 
+            <button class="dice-btn" onclick="finishDamage(1)">1 (-10)</button> 
+            <button class="dice-btn" onclick="finishDamage(2)">2</button> 
+            <button class="dice-btn" onclick="finishDamage(3)">3</button> 
+            <button class="dice-btn" onclick="finishDamage(4)">4</button> 
+            <button class="dice-btn" onclick="finishDamage(5)">5 (+10)</button> 
+            <button class="dice-btn" onclick="finishDamage(6)">6 (+20)</button> 
+        </div> 
+    </div> 
+</div> 
+
+<div class="footer"> 
+    <button onclick="createPlayer()" style="flex:1; background:var(--success); padding:15px; border-radius:10px; color:white; border:none; font-weight:bold;">+ SPIELER</button> 
+    <button onclick="location.reload()" style="flex:1; background:#333; padding:15px; border-radius:10px; color:white; border:none; font-weight:bold;">RESET</button> 
+</div> 
+
+<script> 
+    const audioTracks = {
+    // Tausche die URLs hier gegen deine eigenen Dropbox- oder Discord-Links aus!
+    arena: new Audio('https://actions.google.com/sounds/v1/ambiences/morning_birds.ogg'), 
+    battle: new Audio('https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'),  
+    evolution: new Audio('https://actions.google.com/sounds/v1/science_fiction/alien_beacon.ogg') 
+};
+
+// Musik-Schleifen im Hintergrund aktivieren
+audioTracks.arena.loop = true;
+audioTracks.battle.loop = true;
+let currentTrack = null;
+
+function playMusic(trackName) {
+    if (currentTrack === audioTracks[trackName]) return;
+    if (currentTrack) {
+        currentTrack.pause();
+        currentTrack.currentTime = 0;
+    }
+    currentTrack = audioTracks[trackName];
+    if (currentTrack) {
+        currentTrack.play().catch(err => console.log("iPad wartet auf Berührung des Bildschirms..."));
+    }
+}
+
+// iPad & Mobile Schutz: Aktiviert die Musik beim allerersten Tippen auf das Display
+document.addEventListener('touchstart', () => {
+    playMusic('arena');
+}, { once: true });
+
+// Fallback für den PC (Mausklick)
+document.addEventListener('click', () => {
+    playMusic('arena');
+}, { once: true });
+
+// ==========================================
+// 🎵 ENDE DES MUSIK-SYSTEMS
+// ==========================================
+    const imgTrank = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/potion.png";
+    const imgSuper = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/super-potion.png";
+    const imgHyper = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/hyper-potion.png";
+    const imgBeleber = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/revive.png";
+    const imgTopBeleber = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/max-revive.png";
+    const imgGegengift = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/antidote.png";
+    const pkBallSprite = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png"; 
+
+    const typeChart = {
+        "Normal": { effective: [], weak: ["Gestein", "Stahl"], immune: ["Geist"] },
+        "Feuer": { effective: ["Pflanze", "Eis", "Käfer", "Stahl"], weak: ["Feuer", "Wasser", "Gestein", "Drache"], immune: [] },
+        "Wasser": { effective: ["Feuer", "Boden", "Gestein"], weak: ["Wasser", "Pflanze", "Drache"], immune: [] },
+        "Elektro": { effective: ["Wasser", "Flug"], weak: ["Elektro", "Pflanze", "Drache"], immune: ["Boden"] },
+        "Pflanze": { effective: ["Wasser", "Boden", "Gestein"], weak: ["Feuer", "Pflanze", "Gift", "Flug", "Käfer", "Drache", "Stahl"], immune: [] },
+        "Eis": { effective: ["Pflanze", "Boden", "Flug", "Drache"], weak: ["Feuer", "Wasser", "Eis", "Stahl"], immune: [] },
+        "Kampf": { effective: ["Normal", "Eis", "Gestein", "Unlicht", "Stahl"], weak: ["Gift", "Flug", "Psycho", "Käfer", "Fee"], immune: ["Geist"] },
+        "Gift": { effective: ["Pflanze", "Fee"], weak: ["Gift", "Boden", "Gestein", "Geist"], immune: ["Stahl"] },
+        "Boden": { effective: ["Feuer", "Elektro", "Gift", "Gestein", "Stahl"], weak: ["Pflanze", "Käfer"], immune: ["Flug"] },
+        "Flug": { effective: ["Pflanze", "Kampf", "Käfer"], weak: ["Elektro", "Gestein", "Stahl"], immune: [] },
+        "Psycho": { effective: ["Kampf", "Gift"], weak: ["Psycho", "Stahl"], immune: ["Unlicht"] },
+        "Käfer": { effective: ["Pflanze", "Psycho", "Unlicht"], weak: ["Feuer", "Kampf", "Gift", "Flug", "Geist", "Stahl", "Fee"], immune: [] },
+        "Gestein": { effective: ["Feuer", "Eis", "Flug", "Käfer"], weak: ["Kampf", "Boden", "Stahl"], immune: [] },
+        "Geist": { effective: ["Psycho", "Geist"], weak: ["Unlicht", "Stahl"], immune: ["Normal"] },
+        "Drache": { effective: ["Drache"], weak: ["Stahl"], immune: ["Fee"] },
+        "Unlicht": { effective: ["Psycho", "Geist"], weak: ["Kampf", "Unlicht", "Stahl", "Fee"], immune: [] },
+        "Stahl": { effective: ["Eis", "Gestein", "Fee"], weak: ["Feuer", "Wasser", "Elektro", "Stahl"], immune: [] },
+        "Fee": { effective: ["Kampf", "Drache", "Unlicht"], weak: ["Feuer", "Gift", "Stahl"], immune: [] }
+    };
+
+    const pokemonDB = {
+        "Glumanda": { kat: 1, hp: [140, 160, 180], types: ["Feuer"], icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/4.png", atks: [{ n: "Kratzer", d: 40, s: 1, t: "Normal" }, { n: "Glut", d: 50, s: 2, t: "Feuer" }, { n: "Schlitzer", d: 65, s: 3, t: "Normal" }, { n: "Glut", d: 65, s: 3, t: "Feuer" }] },
+        "Glutexo": { kat: 2, hp: [190, 210, 230], types: ["Feuer"], icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/5.png", atks: [{ n: "Glut", d: 70, s: 1, t: "Feuer" }, { n: "Schlitzer", d: 75, s: 1, t: "Normal" }, { n: "Metallklaue", d: 80, s: 2, t: "Stahl" }, { n: "Flammenwurf", d: 95, s: 3, t: "Feuer" }] },
+        "Glurak": { kat: 3, hp: [240, 260, 280], types: ["Feuer", "Flug"], icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/6.png", atks: [{ n: "Flammenwurf", d: 105, s: 1, t: "Feuer" }, { n: "Drachenklaue", d: 120, s: 2, t: "Drache" }, { n: "Hitzekoller", d: 150, s: 3, t: "Feuer" }, { n: "Geowurf", d: 120, s: 3, t: "Kampf" }] },
+        "Vulpix": { kat: 1, hp: [140, 160, 180], types: ["Feuer"], icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/37.png", atks: [{ n: "Tackle", d: 35, s: 1, t: "Normal" }, { n: "Feuerwirbel", d: 70, s: 2, t: "Feuer" }, { n: "Ruckzuckhieb", d: 50, s: 3, t: "Normal" }, { n: "Glut", d: 70, s: 3, t: "Feuer" }] },
+        "Vulnona": { kat: 3, hp: [210, 230, 250], types: ["Feuer"], icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/38.png", atks: [{ n: "Gegenstoß", d: 100, s: 1, t: "Unlicht" }, { n: "Flammenwurf", d: 100, s: 2, t: "Feuer" }, { n: "Sondersensor", d: 115, s: 3, t: "Psycho" }, { n: "Feuersturm", d: 125, s: 3, t: "Feuer" }] },
+        "Fukano": { kat: 2, hp: [160, 180, 200], types: ["Feuer"], icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/58.png", atks: [{ n: "Biss", d: 50, s: 1, t: "Unlicht" }, { n: "Glut", d: 60, s: 2, t: "Feuer" }, { n: "Bodycheck", d: 80, s: 3, t: "Normal" }, { n: "Flammenwurf", d: 100, s: 3, t: "Feuer" }] },
+        "Arkani": { kat: 4, hp: [240, 260, 280], types: ["Feuer"], icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/59.png", atks: [{ n: "Biss", d: 100, s: 1, t: "Unlicht" }, { n: "Flammenwurf", d: 105, s: 1, t: "Feuer" }, { n: "Feuersturm", d: 125, s: 2, t: "Feuer" }, { n: "Turbotempo", d: 125, s: 3, t: "Normal" }, { n: "Hitzekoller", d: 155, s: 3, t: "Feuer" }] },
+        "Ponita": { kat: 2, hp: [140, 160, 180], types: ["Feuer"], icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/77.png", atks: [{ n: "Tackle", d: 35, s: 1, t: "Normal" }, { n: "Glut", d: 50, s: 2, t: "Feuer" }, { n: "Stampfer", d: 60, s: 3, t: "Normal" }, { n: "Glut", d: 70, s: 3, t: "Feuer" }] },
+        "Gallopa": { kat: 3, hp: [210, 230, 250], types: ["Feuer"], icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/78.png", atks: [{ n: "Bodycheck", d: 85, s: 1, t: "Normal" }, { n: "Glut", d: 80, s: 1, t: "Feuer" }, { n: "Feuersturm", d: 110, s: 2, t: "Feuer" }, { n: "Bodycheck", d: 100, s: 3, t: "Normal" }, { n: "Feuersturm", d: 125, s: 3, t: "Feuer" }] },
+        "Flamara": { kat: 2, hp: [200, 220, 240], types: ["Feuer"], icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/136.png", atks: [{ n: "Ruckzuckhieb", d: 80, s: 1, t: "Normal" }, { n: "Glut", d: 85, s: 1, t: "Feuer" }, { n: "Biss", d: 95, s: 2, t: "Unlicht" }, { n: "Flammenwurf", d: 100, s: 3, t: "Feuer" }] },
+        "Feurigel": { kat: 1, hp: [140, 160, 180], types: ["Feuer"], icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/155.png", atks: [{ n: "Tackle", d: 40, s: 1, t: "Normal" }, { n: "Glut", d: 60, s: 2, t: "Feuer" }, { n: "Ruckzuckhieb", d: 60, s: 3, t: "Normal" }, { n: "Flammenrad", d: 80, s: 3, t: "Feuer" }] },
+        "Igelavar": { kat: 2, hp: [190, 210, 230], types: ["Feuer"], icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/156.png", atks: [{ n: "Ruckzuckhieb", d: 65, s: 1, t: "Normal" }, { n: "Flammenrad", d: 80, s: 1, t: "Feuer" }, { n: "Sternschauer", d: 80, s: 2, t: "Normal" }, { n: "Flammenwurf", d: 100, s: 3, t: "Feuer" }] },
+        "Tornupto": { kat: 3, hp: [240, 260, 280], types: ["Feuer"], icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/157.png", atks: [{ n: "Risikotackle", d: 105, s: 1, t: "Normal" }, { n: "Flammenwurf", d: 100, s: 1, t: "Feuer" }, { n: "Flammensturm", d: 110, s: 2, t: "Feuer" }, { n: "Flammenblitz", d: 120, s: 3, t: "Feuer" }, { n: "Eruption", d: 130, s: 3, t: "Feuer" }] },
+        "Magby": { kat: 1, hp: [140, 160, 180], types: ["Feuer"], icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/240.png", atks: [{ n: "Tackle", d: 40, s: 1, t: "Normal" }, { n: "Glut", d: 45, s: 1, t: "Feuer" }, { n: "Glut", d: 55, s: 2, t: "Feuer" }, { n: "Feuerschlag", d: 75, s: 3, t: "Feuer" }] },
+        "Magmar": { kat: 3, hp: [240, 260, 280], types: ["Feuer"], icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/126.png", atks: [{ n: "Feuerschlag", d: 100, s: 1, t: "Feuer" }, { n: "Flammenwurf", d: 110, s: 2, t: "Feuer" }, { n: "Feuersturm", d: 130, s: 3, t: "Feuer" }] },
+        "Schneckmag": { kat: 2, hp: [170, 190, 210], types: ["Feuer"], icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/218.png", atks: [{ n: "Smog", d: 50, s: 1, t: "Gift", effect: "poison", poisonChance: 40 }, { n: "Glut", d: 55, s: 2, t: "Feuer" }, { n: "Glut", d: 70, s: 3, t: "Feuer" }, { n: "Steinwurf", d: 75, s: 3, t: "Gestein" }] },
+        "Magcargo": { kat: 3, hp: [250, 270, 290], types: ["Feuer", "Gestein"], icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/219.png", atks: [{ n: "Flammenwurf", d: 90, s: 1, t: "Feuer" }, { n: "Flammenwurf", d: 90, s: 2, t: "Feuer" }, { n: "Bodyslam", d: 100, s: 3, t: "Normal" }, { n: "Steinhagel", d: 125, s: 3, t: "Gestein" }] },
+        "Lavados": { kat: 4, hp: [250, 270, 290], types: ["Feuer", "Flug"], icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/146.png", atks: [{ n: "Luftschnitt", d: 110, s: 1, t: "Flug" }, { n: "Flammenwurf", d: 125, s: 2, t: "Feuer" }, { n: "Himmelsfeger", d: 140, s: 3, t: "Flug" }, { n: "Hitzewelle", d: 135, s: 3, t: "Feuer" }] },
+        "Entei": { kat: 4, hp: [250, 270, 290], types: ["Feuer"], icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/244.png", atks: [{ n: "Biss", d: 110, s: 1, t: "Unlicht" }, { n: "Flammenwurf", d: 115, s: 1, t: "Feuer" }, { n: "Flammensturm", d: 125, s: 2, t: "Feuer" }, { n: "Feuersturm", d: 140, s: 3, t: "Feuer" }, { n: "Eruption", d: 160, s: 3, t: "Feuer" }] },
+        "Ho-Oh": { kat: 4, hp: [260, 280, 300], types: ["Feuer", "Flug"], icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/250.png", atks: [{ n: "Windstoß", d: 110, s: 1, t: "Flug" }, { n: "Antik-Kraft", d: 120, s: 1, t: "Gestein" }, { n: "Feuersturm", d: 135, s: 2, t: "Feuer" }, { n: "Strafattacke", d: 130, s: 2, t: "Unlicht" }, { n: "Himmelsfeger", d: 140, s: 3, t: "Flug" }, { n: "Läuterfeuer", d: 145, s: 3, t: "Feuer" }] },
+        "Tragosso": { kat: 2, hp: [160, 180, 200], types: ["Boden"], icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/104.png", atks: [{ n: "Knochenkeule", d: 70, s: 1, t: "Boden" }, { n: "Kopfnuss", d: 80, s: 2, t: "Normal" }, { n: "Knochmerang (2x)", d: 70, s: 3, t: "Boden", m: 2 }, { n: "Kopfnuss", d: 85, s: 3, t: "Normal" }] },
+        "Knogga": { kat: 3, hp: [210, 230, 250], types: ["Boden"], icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/105.png", atks: [{ n: "Knochenkeule", d: 95, s: 1, t: "Boden" }, { n: "Fuchtler", d: 95, s: 2, t: "Normal" }, { n: "Knochenhatz (5x)", d: 40, s: 3, t: "Boden", m: 5 }, { n: "Risikotackle", d: 140, s: 3, t: "Normal" }] },
+        "Sandan": { kat: 1, hp: [140, 160, 180], types: ["Boden"], 
+                   icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/27.png", atks: [{ n: "Kratzer", d: 35, s: 1, t: "Normal" }, { n: "Giftstachel (-10)", d: 40, s: 2, t: "Gift", effect: "poison", poisonChance: 40 }, { n: "Sandgrab", d: 60, s: 3, t: "Boden" }, { n: "Schlitzer", d: 70, s: 3, t: "Normal" }] },
+        "Sandamer": { kat: 3, hp: [210, 230, 250], types: ["Boden"], icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/28.png", 
+                   atks: [{ n: "Sandgrab", d: 90, s: 1, t: "Boden" }, 
+                          { n: "Giftstachel (-15)", d: 70, s: 1, t: "Gift", effect: "poison", poisonChance: 40},
+                          { n: "Schlitzer", d: 100, s: 2, t: "Normal" }, 
+         { n: "Schaufler", d: 120, s: 3, t: "Boden" }, { n: "Schlitzer", d: 120, s: 3, t: "Normal" }] },
+        "Rihorn": { kat: 3, hp: [210, 230, 250], types: ["Boden", "Gestein"], icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/111.png", atks: [{ n: "Hornattacke", d: 100, s: 1, t: "Normal" }, { n: "Stampfer", d: 105, s: 2, t: "Normal" }, { n: "Erdbeben", d: 110, s: 3, t: "Boden" }, { n: "Hornbohrer", d: 130, s: 3, t: "Normal" }] },
+        "Rizeros": { kat: 4, hp: [260, 280, 300], types: ["Boden", "Gestein"], icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/112.png", atks: [{ n: "Hornbohrer", d: 140, s: 1, t: "Normal" }, { n: "Erdbeben", d: 120, s: 1, t: "Boden" }, { n: "Bodycheck", d: 125, s: 2, t: "Normal" }, { n: "Vielender", d: 140, s: 3, t: "Käfer" }, { n: "Erdbeben", d: 140, s: 3, t: "Boden" }] },
+      "Phanpy": { 
+            kat: 1, 
+            hp: [160, 180, 200], 
+            types: ["Boden"], 
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/231.png", 
+            atks: [
+                { n: "Tackle", d: 40, s: 1, t: "Normal" }, 
+                { n: "Tackle", d: 45, s: 2, t: "Normal" }, 
+                { n: "Walzer (3x)", d: 35, s: 3, t: "Gestein", m: 3 }
+            ] 
+        },
+        "Donphan": { 
+            kat: 2, 
+            hp: [210, 230, 250], 
+            types: ["Boden"], 
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/232.png", 
+            atks: [
+                { n: "Hornattacke", d: 70, s: 1, t: "Normal" }, 
+                { n: "Walzer (3x)", d: 45, s: 2, t: "Gestein", m: 3 }, 
+                { n: "Risikotackle", d: 110, s: 3, t: "Normal" }, 
+                { n: "Erdbeben", d: 80, s: 3, t: "Boden" }
+            ] 
+        },
+      "Digda": { 
+            kat: 1, 
+            hp: [130, 150, 170], 
+            types: ["Boden"], 
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/50.png", 
+            atks: [
+                { n: "Kratzer", d: 30, s: 1, t: "Normal" }, 
+                { n: "Intensität", d: 60, s: 2, t: "Boden" }, 
+                { n: "Intensität", d: 70, s: 3, t: "Boden" }
+            ] 
+        },
+        "Digdri": { 
+            kat: 2, 
+            hp: [180, 200, 220], 
+            types: ["Boden"], 
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/51.png", 
+            atks: [
+                { n: "Intensität", d: 80, s: 1, t: "Boden" }, 
+                { n: "Kratzfurie (5x)", d: 30, s: 2, t: "Normal", m: 5 }, 
+                { n: "Erdbeben", d: 90, s: 3, t: "Boden" },
+                { n: "Geofissur", d: 120, s: 3, t: "Boden" }
+            ] 
+        },
+      "Skorgla": { 
+            kat: 2, 
+            hp: [190, 210, 230], 
+            types: ["Boden", "Flug"], 
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/207.png", 
+            atks: [
+                { n: "Giftstachel (-10)", d: 60, s: 1, t: "Gift" , effect: "poison", poisonChance: 40 }, 
+                { n: "Schlitzer", d: 80, s: 2, t: "Normal" }, 
+                { n: "Finte", d: 90, s: 3, t: "Unlicht" },
+                { n: "Guillotine", d: 130, s: 3, t: "Normal" }
+            ] 
+        },
+      "Elekid": { 
+            kat: 2, 
+            hp: [180, 200, 220], 
+            types: ["Elektro"], 
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/239.png", 
+            atks: [
+                { n: "Donnerschock", d: 60, s: 1, t: "Elektro" }, 
+                { n: "Donnerschock", d: 70, s: 2, t: "Elektro" }, 
+                { n: "Fußkick", d: 90, s: 3, t: "Kampf" },
+                { n: "Donnerschlag", d: 110, s: 3, t: "Elektro" }
+            ] 
+        },
+        "Elektek": { 
+            kat: 3, 
+            hp: [230, 250, 270], 
+            types: ["Elektro"], 
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/125.png", 
+            atks: [
+                { n: "Donnerschlag", d: 90, s: 1, t: "Elektro" }, 
+                { n: "Fußkick", d: 95, s: 1, t: "Kampf" }, 
+                { n: "Ladungsstoß", d: 100, s: 2, t: "Elektro" },
+                { n: "Donnerblitz", d: 115, s: 3, t: "Elektro" },
+                { n: "Donner", d: 130, s: 3, t: "Elektro" }
+            ] 
+        },
+      "Blitza": { 
+            kat: 3, 
+            hp: [210, 230, 250], 
+            types: ["Elektro"], 
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/135.png", 
+            atks: [
+                { n: "Donnerschock", d: 95, s: 1, t: "Elektro" }, 
+                { n: "Biss", d: 90, s: 1, t: "Unlicht" }, 
+                { n: "Donnerzahn", d: 105, s: 2, t: "Elektro" },
+                { n: "Bodycheck", d: 120, s: 3, t: "Normal" },
+                { n: "Donner", d: 140, s: 3, t: "Elektro" }
+            ] 
+        },
+        "Zapdos": { 
+            kat: 4, 
+            hp: [240, 260, 280], 
+            types: ["Elektro", "Flug"], 
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/145.png", 
+            atks: [
+                { n: "Donnerschock", d: 110, s: 1, t: "Elektro" }, 
+                { n: "Schnabel", d: 115, s: 1, t: "Flug" }, 
+                { n: "Ladungsstoß", d: 130, s: 2, t: "Elektro" },
+                { n: "Bohrschnabel", d: 140, s: 3, t: "Flug" },
+                { n: "Donner", d: 155, s: 3, t: "Elektro" }
+            ] 
+        },
+        "Raikou": { 
+            kat: 4, 
+            hp: [260, 280, 300], 
+            types: ["Elektro"], 
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/243.png", 
+            atks: [
+                { n: "Funkensprung", d: 100, s: 1, t: "Elektro" }, 
+                { n: "Biss", d: 110, s: 1, t: "Unlicht" }, 
+                { n: "Donnerzahn", d: 150, s: 2, t: "Elektro" },
+                { n: "Knirscher", d: 140, s: 3, t: "Unlicht" },
+                { n: "Donner", d: 155, s: 3, t: "Elektro" }
+            ] 
+        },
+      "Magnetilo": { 
+            kat: 1, 
+            hp: [150, 170, 190], 
+            types: ["Elektro", "Stahl"], 
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/81.png", 
+            atks: [
+                { n: "Donnerschock", d: 35, s: 1, t: "Elektro" }, 
+                { n: "Donnerschock", d: 45, s: 2, t: "Elektro" }, 
+                { n: "Superschall", d: 0, s: 3, t: "Normal", effect: "confuse" },
+                { n: "Funkensprung", d: 65, s: 3, t: "Elektro" }
+            ] 
+        },
+        "Magneton": { 
+            kat: 3, 
+            hp: [200, 220, 240], 
+            types: ["Elektro", "Stahl"], 
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/82.png", 
+            atks: [
+                { n: "Funkensprung", d: 90, s: 1, t: "Elektro" }, 
+                { n: "Superschall", d: 0, s: 1, t: "Normal", effect: "confuse" }, 
+                { n: "Triplette", d: 90, s: 2, t: "Normal" },
+                { n: "Blitzkanone", d: 140, s: 3, t: "Elektro" },
+                { n: "Donnerblitz", d: 100, s: 3, t: "Elektro" }
+            ] 
+        },
+      "Voltobal": { 
+            kat: 1, 
+            hp: [130, 150, 170], 
+            types: ["Elektro"], 
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/100.png", 
+            atks: [
+                { n: "Tackle", d: 45, s: 1, t: "Normal" }, 
+                { n: "Tackle", d: 55, s: 2, t: "Normal" }, 
+                { n: "Finale", d: 110, s: 3, t: "Normal", selfKO: true },
+                { n: "Funkensprung", d: 70, s: 3, t: "Elektro" }
+            ] 
+        },
+        "Lektrobal": { 
+            kat: 2, 
+            hp: [180, 200, 220], 
+            types: ["Elektro"], 
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/101.png", 
+            atks: [
+                { n: "Funkensprung", d: 70, s: 1, t: "Elektro" }, 
+                { n: "Walzer (3x)", d: 40, s: 2, t: "Gestein", m: 3 }, 
+                { n: "Explosion", d: 150, s: 3, t: "Normal", selfKO: true },
+                { n: "Funkensprung", d: 100, s: 3, t: "Elektro" }
+            ] 
+        },
+      "Voltilamm": { 
+            kat: 1, hp: [140, 160, 180], types: ["Elektro"], 
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/179.png", 
+            atks: [
+                { n: "Tackle", d: 35, s: 1, t: "Normal" }, 
+                { n: "Tackle", d: 45, s: 2, t: "Normal" }, 
+                { n: "Donnerschock", d: 60, s: 3, t: "Elektro" }
+            ] 
+        },
+        "Waaty": { 
+            kat: 2, hp: [190, 210, 230], types: ["Elektro"], 
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/180.png", 
+            atks: [
+                { n: "Tackle", d: 65, s: 1, t: "Normal" }, 
+                { n: "Donnerschock", d: 70, s: 1, t: "Elektro" }, 
+                { n: "Bodyslam", d: 90, s: 2, t: "Normal" },
+                { n: "Ladungsstoß", d: 90, s: 3, t: "Elektro" }
+            ] 
+        },
+        "Ampharos": { 
+            kat: 3, hp: [240, 260, 280], types: ["Elektro"], 
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/181.png", 
+            atks: [
+                { n: "Bodyslam", d: 95, s: 1, t: "Normal" }, 
+                { n: "Ladungsstoß", d: 90, s: 1, t: "Elektro" }, 
+                { n: "Donnerschlag", d: 105, s: 2, t: "Elektro" },
+                { n: "Donner", d: 130, s: 3, t: "Elektro" }
+            ] 
+        },
+      "Pichu": { 
+            kat: 1, hp: [120, 140, 160], types: ["Elektro"], 
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/172.png", 
+            atks: [
+                { n: "Donnerschock", d: 35, s: 1, t: "Elektro" }, 
+                { n: "Donnerschock", d: 50, s: 2, t: "Elektro" }, 
+                { n: "Donnerblitz", d: 80, s: 3, t: "Elektro" }
+            ] 
+        },
+        "Pikachu": { 
+            kat: 2, hp: [170, 190, 210], types: ["Elektro"], 
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/25.png", 
+            atks: [
+                { n: "Donnerblitz", d: 90, s: 1, t: "Elektro" }, 
+                { n: "Ruckzuckhieb", d: 80, s: 1, t: "Normal" }, 
+                { n: "Slam", d: 95, s: 2, t: "Normal" },
+                { n: "Donnerblitz", d: 110, s: 3, t: "Elektro" },
+                { n: "Volttackle", d: 95, s: 3, t: "Elektro" }
+            ] 
+        },
+        "Raichu": { 
+            kat: 3, hp: [240, 260, 280], types: ["Elektro"], 
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/26.png", 
+            atks: [
+                { n: "Donnerblitz", d: 100, s: 1, t: "Elektro" }, 
+                { n: "Slam", d: 100, s: 1, t: "Normal" }, 
+                { n: "Volttackle", d: 120, s: 2, t: "Elektro" },
+                { n: "Slam", d: 135, s: 3, t: "Normal" },
+                { n: "Donnerblitz", d: 120, s: 3, t: "Elektro" }
+            ] 
+        },
+      "Nebulak": {
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/92.png",
+            types: ["Geist", "Gift"], kat: 1, hp: [120, 140, 160],
+            atks: [
+                { s: 1, n: "Schlecker", d: 50, t: "Geist" },
+                { s: 2, n: "Schlecker ", d: 60, t: "Geist" },
+                { s: 3, n: "Konfusstrahl", d: 0, t: "Geist" },
+                { s: 3, n: "Schlecker  ", d: 70, t: "Geist" }
+            ]
+        },
+        "Alpollo": {
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/93.png",
+            types: ["Geist", "Gift"], kat: 2, hp: [170, 190, 210],
+            atks: [
+                { s: 1, n: "Schlecker", d: 80, t: "Geist" },
+                { s: 1, n: "Konfusstrahl", d: 0, t: "Geist" },
+                { s: 2, n: "Nachtnebel", d: 95, t: "Geist" },
+                { s: 3, n: "Hypnose", d: 0, t: "Psycho" },
+                { s: 3, n: "Nachtnebel ", d: 100, t: "Geist" }
+            ]
+        },
+        "Gengar": {
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/94.png",
+            types: ["Geist", "Gift"], kat: 3, hp: [220, 240, 260],
+            atks: [
+                { s: 1, n: "Finsterfaust", d: 115, t: "Geist" },
+                { s: 1, n: "Konfusstrahl", d: 0, t: "Geist" },
+                { s: 2, n: "Spukball", d: 130, t: "Geist" },
+                { s: 3, n: "Hypnose", d: 0, t: "Psycho" },
+                { s: 3, n: "Spukball ", d: 140, t: "Geist" }
+            ]
+        },
+      "Traunfugil": {
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/200.png",
+            types: ["Geist"], kat: 1, hp: [140, 160, 180],
+            atks: [
+                { s: 1, n: "Psywelle", d: 50, t: "Psycho" },
+                { s: 2, n: "Erstauner", d: 55, t: "Geist" },
+                { s: 3, n: "Konfusstrahl", d: 0, t: "Geist" },
+                { s: 3, n: "Erstauner ", d: 70, t: "Geist" }
+            ]
+        },
+      "Kabuto": {
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/140.png",
+            types: ["Gestein", "Wasser"], kat: 1, hp: [120, 140, 160],
+            atks: [
+                { s: 1, n: "Kratzer", d: 30, t: "Normal" },
+                { s: 2, n: "Kratzer ", d: 40, t: "Normal" },
+                { s: 3, n: "Absorber (+)", d: 40, t: "Pflanze", drain: true }
+            ]
+        },
+        "Kabutops": {
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/141.png",
+            types: ["Gestein", "Wasser"], kat: 2, hp: [180, 200, 220],
+            atks: [
+                { s: 1, n: "Schlitzer", d: 70, t: "Normal" },
+                { s: 1, n: "Megasauger (+)", d: 60, t: "Pflanze", drain: true },
+                { s: 2, n: "Wasserdüse", d: 80, t: "Wasser" },
+                { s: 3, n: "Lehmschuss", d: 90, t: "Boden" },
+                { s: 3, n: "Antik-Kraft", d: 110, t: "Gestein" }
+            ]
+        },
+      "Larvitar": {
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/246.png",
+            types: ["Gestein", "Boden"], kat: 1, hp: [140, 160, 180],
+            atks: [
+                { s: 1, n: "Biss", d: 55, t: "Unlicht" },
+                { s: 2, n: "Zermürben", d: 60, t: "Normal" },
+                { s: 3, n: "Steinhagel", d: 75, t: "Gestein" }
+            ]
+        },
+        "Pupitar": {
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/247.png",
+            types: ["Gestein", "Boden"], kat: 2, hp: [190, 210, 230],
+            atks: [
+                { s: 1, n: "Steinhagel", d: 80, t: "Gestein" },
+                { s: 1, n: "Zermürben", d: 70, t: "Normal" },
+                { s: 2, n: "Fuchtler", d: 80, t: "Normal" },
+                { s: 3, n: "Finsteraura", d: 100, t: "Unlicht" }
+            ]
+        },
+        "Despotar": {
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/248.png",
+            types: ["Unlicht", "Gestein"], kat: 4, hp: [260, 280, 300], // Kat 4 laut deiner Karte oben links!
+            atks: [
+                { s: 1, n: "Erdbeben", d: 110, t: "Boden" },
+                { s: 1, n: "Finsteraura", d: 120, t: "Unlicht" },
+                { s: 2, n: "Knirscher", d: 130, t: "Unlicht" },
+                { s: 3, n: "Hyperstrahl", d: 170, t: "Normal" },
+                { s: 3, n: "Steinkante", d: 140, t: "Gestein" }
+            ]
+        },
+      "Aerodactyl": {
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/142.png",
+            types: ["Gestein", "Flug"], kat: 3, hp: [230, 250, 270],
+            atks: [
+                { s: 1, n: "Flügelschlag", d: 90, t: "Flug" },
+                { s: 2, n: "Biss", d: 100, t: "Unlicht" },
+                { s: 3, n: "Hyperstrahl", d: 130, t: "Normal" },
+                { s: 3, n: "Antik-Kraft", d: 110, t: "Gestein" }
+            ]
+        },
+        "Onix": {
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/95.png",
+            types: ["Gestein", "Boden"], kat: 3, hp: [270, 290, 310],
+            atks: [
+                { s: 1, n: "Klammergriff", d: 70, t: "Normal" },
+                { s: 2, n: "Steinwurf", d: 80, t: "Gestein" },
+                { s: 3, n: "Steinwurf ", d: 85, t: "Gestein" },
+                { s: 3, n: "Slam", d: 95, t: "Normal" }
+            ]
+        },
+      "Mogelbaum": {
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/185.png",
+            types: ["Gestein"], kat: 2, hp: [170, 190, 210],
+            atks: [
+                { s: 1, n: "Dreschflegel", d: 75, t: "Normal" },
+                { s: 2, n: "Fußkick", d: 80, t: "Kampf" },
+                { s: 3, n: "Steinhagel", d: 90, t: "Gestein" },
+                { s: 3, n: "Finte", d: 100, t: "Unlicht" }
+            ]
+        },
+        "Amonitas": {
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/138.png",
+            types: ["Gestein", "Wasser"], kat: 1, hp: [130, 150, 170],
+            atks: [
+                { s: 1, n: "Umklammerung", d: 30, t: "Normal" },
+                { s: 2, n: "Biss", d: 45, t: "Unlicht" },
+                { s: 3, n: "Aquaknarre", d: 60, t: "Wasser" }
+            ]
+        },
+        "Amoroso": {
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/139.png",
+            types: ["Gestein", "Wasser"], kat: 3, hp: [210, 230, 250],
+            atks: [
+                { s: 1, n: "Aquaknarre", d: 80, t: "Wasser" },
+                { s: 1, n: "Biss", d: 70, t: "Unlicht" },
+                { s: 2, n: "Lake", d: 100, t: "Wasser" },
+                { s: 3, n: "Hydropumpe", d: 130, t: "Wasser" },
+                { s: 3, n: "Antik-Kraft", d: 110, t: "Gestein" }
+            ]
+        },
+      "Kleinstein": {
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/74.png",
+            types: ["Gestein", "Boden"], kat: 1, hp: [150, 170, 190],
+            atks: [
+                { s: 1, n: "Tackle", d: 35, t: "Normal" },
+                { s: 2, n: "Steinwurf", d: 50, t: "Gestein" },
+                { s: 3, n: "Tackle ", d: 50, t: "Normal" },
+                { s: 3, n: "Steinwurf ", d: 60, t: "Gestein" }
+            ]
+        },
+        "Georok": {
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/75.png",
+            types: ["Gestein", "Boden"], kat: 2, hp: [200, 220, 240],
+            atks: [
+                { s: 1, n: "Steinwurf", d: 70, t: "Gestein" },
+                { s: 2, n: "Finale", d: 130, t: "Normal", selfKO: true }, // Zwingt den Angreifer auf 0 HP
+                { s: 3, n: "Intensität", d: 110, t: "Boden" },
+                { s: 3, n: "Walzer (3x)", d: 40, t: "Gestein", m: 3 } // Trifft bis zu 3-mal
+            ]
+        },
+        "Geowaz": {
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/76.png",
+            types: ["Gestein", "Boden"], kat: 3, hp: [250, 270, 290],
+            atks: [
+                { s: 1, n: "Felswurf (5x)", d: 45, t: "Gestein", m: 5 }, // Mittlerer Wert zwischen 30 und 50, trifft bis zu 5-mal
+                { s: 2, n: "Risikotackle", d: 110, t: "Normal" },
+                { s: 3, n: "Erdbeben", d: 110, t: "Boden" },
+                { s: 3, n: "Explosion", d: 170, t: "Normal", selfKO: true } // Zwingt den Angreifer auf 0 HP
+            ]
+        },
+      "Smogon": { 
+    kat: 1, 
+    hp: [160, 180, 200], 
+    types: ["Gift"], 
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/109.png", 
+    atks: [
+        { s: 1, n: "Tackle", d: 40, t: "Normal" }, 
+        { s: 2, n: "Tackle", d: 45, t: "Normal" }, 
+        { s: 3, n: "Giftwolke (-15)", d: 50, t: "Gift", effect: "poison", poisonChance:  80 }, 
+        { s: 3, n: "Smog (-5)", d: 50, t: "Gift", effect: "poison", poisonChance: 40 }
+    ] 
+},
+
+"Smogmog": { 
+    kat: 2, 
+    hp: [210, 230, 250], 
+    types: ["Gift"], 
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/110.png", 
+    atks: [
+        { s: 1, n: "Finale", d: 110, t: "Normal", selfKO: true }, 
+        { s: 1, n: "Giftwolke (-20)", d: 50, t: "Gift", effect: "poison", poisonChance: 80 },
+        { s: 2, n: "Schlammbad (-10)", d: 65, t: "Gift", effect: "poison", poisonChance: 40 },
+        { s: 3, n: "Giftwolke (-25)", d: 65, t: "Gift", effect: "poison", poisonChance: 80 },
+        { s: 3, n: "Explosion", d: 130, t: "Normal", selfKO: true }
+    ] 
+},
+      "Sleima": { 
+    kat: 1, 
+    hp: [180, 200, 220], 
+    types: ["Gift"], 
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/88.png", 
+    atks: [
+        { s: 1, n: "Pfund", d: 20, t: "Normal" }, 
+        { s: 2, n: "Pfund", d: 30, t: "Normal" }, 
+        { s: 3, n: "Giftwolke (-15)", d: 20, t: "Gift", effect: "poison", poisonChance: 80 }
+    ] 
+},
+
+"Sleimok": { 
+    kat: 2, 
+    hp: [280, 300, 320], 
+    types: ["Gift"], 
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/89.png", 
+    atks: [
+        { s: 1, n: "Pfund", d: 60, t: "Normal" }, 
+        { s: 1, n: "Giftwolke (-20)", d: 35, t: "Gift", effect: "poison", poisonChance: 80 }, 
+        { s: 2, n: "Matschbombe (-10)", d: 60, t: "Gift", effect: "poison", poisonChance: 40 }, 
+        { s: 3, n: "Matschbombe (-10)", d: 70, t: "Gift", effect: "poison", poisonChance: 40 }
+    ] 
+},
+      "Nidoran♂": { 
+    kat: 1, 
+    hp: [140, 160, 180], 
+    types: ["Gift"], 
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/32.png", 
+    atks: [
+        { s: 1, n: "Tackle", d: 40, t: "Normal" }, 
+        { s: 2, n: "Tackle", d: 50, t: "Normal" }, 
+        { s: 3, n: "Giftstachel (-10)", d: 50, t: "Gift", effect: "poison", poisonChance: 40 },
+        { s: 3, n: "Hornattacke", d: 60, t: "Normal" }
+    ] 
+},
+
+"Nidorino": { 
+    kat: 2, 
+    hp: [190, 210, 230], 
+    types: ["Gift"], 
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/33.png", 
+    atks: [
+        { s: 1, n: "Giftstachel (-10)", d: 60, t: "Gift", effect: "poison", poisonChance: 40 }, 
+        { s: 1, n: "Hornattacke", d: 70, t: "Normal" }, 
+        { s: 2, n: "Furienschlag", d: 35, t: "Normal", m: 5 }, 
+        { s: 2, n: "Hornattacke", d: 80, t: "Normal" }, 
+        { s: 3, n: "Hornbohrer", d: 120, t: "Normal" }, 
+        { s: 3, n: "Doppelkick", d: 65, t: "Kampf", m: 2 }
+    ] 
+},
+
+"Nidoking": { 
+    kat: 3, 
+    hp: [240, 260, 280], 
+    types: ["Gift", "Boden"], 
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/34.png", 
+    atks: [
+        { s: 1, n: "Giftstachel (-15)", d: 80, t: "Gift", effect: "poison", poisonChance: 40 }, 
+        { s: 1, n: "Hornbohrer", d: 125, t: "Normal" }, 
+        { s: 2, n: "Erdkräfte", d: 100, t: "Boden" }, 
+        { s: 3, n: "Erdkräfte", d: 110, t: "Boden" }, 
+        { s: 3, n: "Vielender", d: 130, t: "Käfer" }
+    ] 
+},
+      "Nidoran♀": { 
+    kat: 1, 
+    hp: [140, 160, 180], 
+    types: ["Gift"], 
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/29.png", 
+    atks: [
+        { n: "Tackle", d: 40, s: 1, t: "Normal" }, 
+        { n: "Tackle", d: 50, s: 2, t: "Normal" }, 
+        { n: "Giftstachel (-10)", d: 50, s: 3, t: "Gift", effect: "poison", poisonChance: 40 }, 
+        { n: "Hornattacke", d: 60, s: 3, t: "Normal" }
+    ] 
+},
+
+"Nidorina": { 
+    kat: 2, 
+    hp: [190, 210, 230], 
+    types: ["Gift"], 
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/30.png", 
+    atks: [
+        { n: "Giftstachel (-10)", d: 55, s: 1, t: "Gift", effect: "poison", poisonChance: 40 }, 
+        { n: "Hornattacke", d: 65, s: 1, t: "Normal" }, 
+        { n: "Kratzfurie (5x)", d: 40, s: 2, t: "Normal", m: 5 }, 
+        { n: "Biss", d: 75, s: 2, t: "Unlicht" }, 
+        { n: "Knirscher", d: 90, s: 3, t: "Unlicht" }, 
+        { n: "Doppelkick (2x)", d: 60, s: 3, t: "Kampf", m: 2 }
+    ] 
+},
+      "Nidoqueen":{
+    kat: 3,
+    hp: [240, 260, 280],
+    types: ["Gift", "Boden"],
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/31.png",
+    atks: [
+        { n: "Giftstachel (-15)", d: 75, s: 1, t: "Gift", effect: "poison", poisonChance: 40 },
+        { n: "Bodyslam", d: 100, s: 1, t: "Normal" },
+        { n: "Erdkräfte", d: 100, s: 2, t: "Boden" },
+        { n: "Erdkräfte", d: 110, s: 3, t: "Boden" },
+        { n: "Kraftkoloss", d: 120, s: 3, t: "Kampf" }
+    ]
+},
+      "Bisasam": {
+    kat: 1,
+    hp: [160, 180, 200],
+    types: ["Pflanze", "Gift"],
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/1.png",
+    atks: [
+        { n: "Tackle", d: 35, s: 1, t: "Normal" },
+        { n: "Tackle", d: 45, s: 2, t: "Normal" },
+        { n: "Giftpuder (-5)", d: 40, s: 3, t: "Gift", effect: "poison", poisonChance: 80 },
+        { n: "Rankenhieb", d: 55, s: 3, t: "Pflanze" }
+    ]
+},
+
+"Bisaknosp": {
+    kat: 2,
+    hp: [210, 230, 250],
+    types: ["Pflanze", "Gift"],
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/2.png",
+    atks: [
+        { n: "Giftpuder (-10)", d: 45, s: 1, t: "Gift", effect: "poison", poisonChance: 80 },
+        { n: "Rankenhieb", d: 60, s: 1, t: "Pflanze" },
+        { n: "Bodycheck", d: 70, s: 2, t: "Normal" },
+        { n: "Schlafpuder", d: 0, s: 3, t: "Pflanze", effect: "sleep" },
+        { n: "Rasierblatt (+2 Crit)", d: 80, s: 3, t: "Pflanze" }
+    ]
+},
+
+"Bisaflor": {
+    kat: 3,
+    hp: [260, 280, 300],
+    types: ["Pflanze", "Gift"],
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/3.png",
+    atks: [
+        { n: "Giftpuder (-15)", d: 70, s: 1, t: "Gift", effect: "poison", poisonChance: 80 },
+        { n: "Rankenhieb", d: 90, s: 1, t: "Pflanze" },
+        { n: "Rasierblatt (+2 Crit)", d: 100, s: 2, t: "Pflanze" },
+        { n: "Bodycheck", d: 115, s: 3, t: "Normal" },
+        { n: "Solarstrahl", d: 125, s: 3, t: "Pflanze" }
+    ]
+},
+      "Endivie": {
+    kat: 1,
+    hp: [140, 160, 180],
+    types: ["Pflanze"],
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/152.png",
+    atks: [
+        { n: "Tackle", d: 40, s: 1, t: "Normal" },
+        { n: "Tackle", d: 50, s: 2, t: "Normal" },
+        { n: "Tackle", d: 60, s: 3, t: "Normal" },
+        { n: "Rasierblatt (+2 Crit)", d: 60, s: 3, t: "Pflanze" }
+    ]
+},
+
+"Lorblatt": {
+    kat: 2,
+    hp: [190, 210, 230],
+    types: ["Pflanze"],
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/153.png",
+    atks: [
+        { n: "Tackle", d: 65, s: 1, t: "Normal" },
+        { n: "Rasierblatt (+2 Crit)", d: 70, s: 1, t: "Pflanze" },
+        { n: "Bodyslam", d: 80, s: 2, t: "Normal" },
+        { n: "Rankenhieb", d: 90, s: 3, t: "Pflanze" },
+        { n: "Rasierblatt (+2 Crit)", d: 90, s: 3, t: "Pflanze" }
+    ]
+},
+
+"Meganie": {
+    kat: 3,
+    hp: [240, 260, 280],
+    types: ["Pflanze"],
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/154.png",
+    atks: [
+        { n: "Bodyslam", d: 100, s: 1, t: "Normal" },
+        { n: "Rasierblatt (+2 Crit)", d: 100, s: 1, t: "Pflanze" },
+        { n: "Blättersturm", d: 120, s: 2, t: "Pflanze" },
+        { n: "Bodyslam", d: 120, s: 3, t: "Normal" },
+        { n: "Solarstrahl", d: 150, s: 3, t: "Pflanze" }
+    ]
+},
+      "Tangela": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/114.png",
+        kat: 1,
+        hp: [190, 210, 230],
+        types: ["Pflanze"],
+        atks: [
+            { n: "Giftpuder (-10)", d: 40, t: "Gift", s: 1, effect: "poison", poisonChance: 80 },
+            { n: "Rankenhieb", d: 60, t: "Pflanze", s: 1 },
+            { n: "Klammergriff", d: 65, t: "Normal", s: 2 },
+            { n: "Schlafpuder", d: 0, t: "Pflanze", s: 3, effect: "sleep" },
+            { n: "Rankenhieb", d: 80, t: "Pflanze", s: 3 }
+        ]
+    },
+"Tangoloss": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/465.png",
+        kat: 1,
+        hp: [250, 270, 290],
+        types: ["Pflanze"],
+        atks: [
+            { n: "Giftpuder (-15)", d: 45, t: "Gift", s: 1, effect: "poison", poisonChance: 80 },
+            { n: "Megasauger (+)", d: 60, t: "Pflanze", s: 1, drain: true },
+            { n: "Slam", d: 90, t: "Normal", s: 2 },
+            { n: "Schlafpuder", d: 0, t: "Pflanze", s: 3, effect: "sleep" },
+            { n: "Megasauger (+)", d: 70, t: "Pflanze", s: 3, drain: true }
+        ]
+    },
+   "Knofensa": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/69.png",
+        kat: 1,
+        hp: [130, 150, 170],
+        types: ["Pflanze", "Gift"],
+        atks: [
+            { n: "Wickel", d: 35, s: 1, t: "Normal" },
+            { n: "Wickel", d: 45, s: 2, t: "Normal" },
+            { n: "Giftpuder (-5)", d: 35, s: 3, t: "Gift", effect: "poison", poisonChance: 80 },
+            { n: "Rankenhieb", d: 50, s: 3, t: "Pflanze" }
+        ]
+    },
+    "Ultrigaria": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/70.png",
+        kat: 1,
+        hp: [180, 200, 220],
+        types: ["Pflanze", "Gift"],
+        atks: [
+            { n: "Giftpuder (-10)", d: 40, s: 1, t: "Gift", effect: "poison", poisonChance: 80 },
+            { n: "Rankenhieb", d: 65, s: 1, t: "Pflanze" },
+            { n: "Rankenhieb", d: 70, s: 2, t: "Pflanze" },
+            { n: "Säure", d: 75, s: 3, t: "Gift" }
+        ]
+    },
+    "Sarzenia": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/71.png",
+        kat: 1,
+        hp: [230, 250, 270],
+        types: ["Pflanze", "Gift"],
+        atks: [
+            { n: "Säure", d: 80, s: 1, t: "Gift" },
+            { n: "Rankenhieb", d: 90, s: 1, t: "Pflanze" },
+            { n: "Rasierblatt (+2 Crit)", d: 95, s: 2, t: "Pflanze", crit: 2 },
+            { n: "Rasierblatt (+2 Crit)", d: 105, s: 3, t: "Pflanze", crit: 2 },
+            { n: "Slam", d: 130, s: 3, t: "Normal" }
+        ]
+    },
+    "Hoppspross": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/187.png",
+        kat: 1,
+        hp: [110, 130, 150],
+        types: ["Pflanze", "Flug"],
+        atks: [
+            { n: "Tackle", d: 30, s: 1, t: "Normal" },
+            { n: "Tackle", d: 45, s: 2, t: "Normal" },
+            { n: "Tackle", d: 50, s: 3, t: "Normal" }
+        ]
+    },
+    "Hubelupf": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/188.png",
+        kat: 1,
+        hp: [160, 180, 170],
+        types: ["Pflanze", "Flug"],
+        atks: [
+            { n: "Tackle", d: 60, s: 1, t: "Normal" },
+            { n: "Schlafpuder", d: 0, s: 1, t: "Pflanze", effect: "sleep" },
+            { n: "Giftpuder (-10)", d: 50, s: 2, t: "Gift", effect: "poison", poisonChance: 80 },
+            { n: "Megasauger (+)", d: 50, s: 3, t: "Pflanze", drain: true }
+        ]
+    },
+    "Papungha": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/189.png",
+        kat: 1,
+        hp: [210, 230, 250],
+        types: ["Pflanze", "Flug"],
+        atks: [
+            { n: "Schlafpuder", d: 0, s: 1, t: "Pflanze", effect: "sleep" },
+            { n: "Kugelsaat (5x)", d: 40, s: 1, t: "Pflanze", m: 5 },
+            { n: "Giftpuder (-15)", d: 60, s: 2, t: "Gift", effect: "poison", poisonChance: 80 },
+            { n: "Gigasauger (+)", d: 80, s: 3, t: "Pflanze", drain: true }
+        ]
+    },
+    "Myrapla": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/43.png",
+        kat: 1,
+        hp: [130, 150, 170],
+        types: ["Pflanze", "Gift"],
+        atks: [
+            { n: "Absorber (+)", d: 20, s: 1, t: "Pflanze", drain: true },
+            { n: "Absorber (+)", d: 30, s: 2, t: "Pflanze", drain: true },
+            { n: "Dreschflegel", d: 75, s: 3, t: "Normal" },
+            { n: "Absorber (+)", d: 40, s: 3, t: "Pflanze", drain: true }
+        ]
+    },
+    "Duflor": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/44.png",
+        kat: 1,
+        hp: [180, 200, 220],
+        types: ["Pflanze", "Gift"],
+        atks: [
+            { n: "Giftpuder (-10)", d: 50, s: 1, t: "Gift", effect: "poison", poisonChance: 80 },
+            { n: "Absorber (+)", d: 50, s: 1, t: "Pflanze", drain: true },
+            { n: "Säure", d: 70, s: 2, t: "Gift" },
+            { n: "Schlafpuder", d: 0, s: 3, t: "Pflanze", effect: "sleep" },
+            { n: "Blättertanz (3x)", d: 40, s: 3, t: "Pflanze", m: 3 },
+        ]
+    },
+    "Giflor": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/45.png",
+        kat: 1,
+        hp: [230, 250, 270],
+        types: ["Pflanze", "Gift"],
+        atks: [
+            { n: "Giftpuder (-15)", d: 70, s: 1, t: "Gift", effect: "poison", poisonChance: 80 },
+            { n: "Blättertanz (3x)", d: 45, s: 1, t: "Pflanze", m: 3 },
+            { n: "Megasauger (+)", d: 70, s: 2, t: "Pflanze", drain: true },
+            { n: "Megasauger (+)", d: 80, s: 3, t: "Pflanze", drain: true },
+            { n: "Solarstrahl", d: 140, s: 3, t: "Pflanze" }
+        ]
+    },
+    "Blubella": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/182.png",
+        kat: 1,
+        hp: [230, 250, 270],
+        types: ["Pflanze"],
+        atks: [
+            { n: "Giftpuder (-15)", d: 70, s: 1, t: "Gift", effect: "poison", poisonChance: 80 },
+            { n: "Blättertanz (3x)", d: 45, s: 1, t: "Pflanze", m: 3 },
+            { n: "Megasauger (+)", d: 70, s: 2, t: "Pflanze", drain: true },
+            { n: "Megasauger (+)", d: 80, s: 3, t: "Pflanze", drain: true },
+            { n: "Solarstrahl", d: 140, s: 3, t: "Pflanze" }
+        ]
+    },
+    "Sonnkern": {
+        "icon": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/191.png",
+        "kat": 1,
+        "hp": [130, 150, 170],
+        "types": ["Pflanze"],
+        "atks": [
+            { "n": "Absorber", "d": 10, "s": 1, "t": "Pflanze", "drain": true },
+            { "n": "Absorber", "d": 20, "s": 2, "t": "Pflanze", "drain": true },
+            { "n": "Megasauger", "d": 50, "s": 3, "t": "Pflanze", "drain": true }
+        ]
+    },
+    "Sonnflora": {
+        "icon": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/192.png",
+        "kat": 1,
+        "hp": [180, 200, 220],
+        "types": ["Pflanze"],
+        "atks": [
+            { "n": "Megasauger", "d": 55, "s": 1, "t": "Pflanze", "drain": true },
+            { "n": "Kugelsaat", "d": 35, "s": 2, "t": "Pflanze", "m": 5 },
+            { "n": "Solarstrahl", "d": 110, "s": 3, "t": "Pflanze" },
+            { "n": "Rasierblatt", "d": 90, "s": 3, "t": "Pflanze", "crit": 2 }
+        ]
+    },
+    "Celebi": {
+        "icon": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/251.png",
+        "kat": 1,
+        "hp": [240, 260, 280],
+        "types": ["Psycho", "Pflanze"],
+        "atks": [
+            { "n": "Konfusion", "d": 120, "s": 1, "t": "Psycho" },
+            { "n": "Zauberblatt", "d": 125, "s": 2, "t": "Pflanze" },
+            { "n": "Seher", "d": 135, "s": 3, "t": "Psycho" },
+            { "n": "Blättersturm", "d": 165, "s": 3, "t": "Pflanze" }
+        ]
+    },
+    "Taubsi": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/16.png",
+        kat: 1,
+        hp: [140, 160, 180],
+        types: ["Normal", "Flug"],
+        atks: [
+            { n: "Tackle", d: 35, s: 1, t: "Normal" },
+            { n: "Tackle", d: 40, s: 2, t: "Normal" },
+            { n: "Ruckzuckhieb", d: 50, s: 3, t: "Normal" },
+            { n: "Windstoß", d: 65, s: 3, t: "Flug" }
+        ]
+    },
+    "Tauboga": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/17.png",
+        kat: 1,
+        hp: [190, 210, 230],
+        types: ["Normal", "Flug"],
+        atks: [
+            { n: "Ruckzuckhieb", d: 70, s: 1, t: "Normal" },
+            { n: "Windstoß", d: 70, s: 1, t: "Flug" },
+            { n: "Windstoß", d: 80, s: 2, t: "Flug" },
+            { n: "Flügelschlag", d: 95, s: 3, t: "Flug" }
+        ]
+    },
+    "Tauboss": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/18.png",
+        kat: 1,
+        hp: [240, 260, 280],
+        types: ["Normal", "Flug"],
+        atks: [
+            { n: "Ruckzuckhieb", d: 90, s: 1, t: "Normal" },
+            { n: "Flügelschlag", d: 95, s: 1, t: "Flug" },
+            { n: "Windhose", d: 120, s: 2, t: "Drache" },
+            { n: "Windhose", d: 130, s: 3, t: "Drache" },
+            { n: "Luftschnitt", d: 140, s: 3, t: "Flug" }
+        ]
+    },
+      "Habitak": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/21.png",
+        kat: 1,
+        hp: [140, 160, 180],
+        types: ["Normal", "Flug"],
+        atks: [
+            { n: "Schnabel", d: 40, s: 1, t: "Flug" },
+            { n: "Schnabel", d: 50, s: 2, t: "Flug" },
+            { n: "Furienschlag (5x)", d: 25, s: 3, t: "Normal", m: 5 }
+        ]
+    },
+    "Ibitak": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/versions/generation-iv/heartgold-soulsilver/22.png",
+        kat: 1,
+        hp: [190, 210, 230],
+        types: ["Normal", "Flug"],
+        atks: [
+            { n: "Furienschlag (5x)", d: 35, s: 1, t: "Normal", m: 5 },
+            { n: "Verfolgung", d: 90, s: 2, t: "Unlicht" },
+            { n: "Bohrschnabel", d: 90, s: 3, t: "Flug" }
+        ]
+    },
+      "Wiesor": {
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/161.png",
+    kat: 1,
+    hp: [150, 170, 190],
+    types: ["Normal"],
+    atks: [
+        { n: "Kratzer", d: 40, s: 1, t: "Normal" },
+        { n: "Kratzer", d: 50, s: 2, t: "Normal" },
+        { n: "Ruckzuckhieb", d: 70, s: 3, t: "Normal" }
+    ]
+},
+"Wiesenior": {
+    "icon": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/162.png",
+    "kat": 3,
+    "hp": [220, 240, 260],
+    "types": ["Normal"],
+    "atks": [
+        { "n": "Ruckzuckhieb", "d": 80, "s": 1, "t": "Normal" },
+        { "n": "Kratzfurie (5x)", "d": 35, "s": 1, "t": "Normal", "m": 5 }, 
+        { "n": "Slam", "d": 110, "s": 2, "t": "Normal" },
+        { "n": "Slam", "d": 130, "s": 3, "t": "Normal" },
+        { "n": "Tiefschlag", "d": 110, "s": 3, "t": "Unlicht" }
+    ]
+},
+"Pii": {
+    "icon": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/173.png",
+    "kat": 1,
+    "hp": [120, 140, 160],
+    "types": ["Normal"],
+    "atks": [
+        { "n": "Pfund", "d": 30, "s": 1, "t": "Normal" },
+        { "n": "Pfund", "d": 40, "s": 2, "t": "Normal" },
+        { "n": "Gesang", "effect": "sleep", "s": 2, "t": "Normal" },
+        { "n": "Pfund", "d": 50, "s": 3, "t": "Normal" }
+    ]
+},
+"Piepi": {
+    "icon": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/035.png",
+    "kat": 2,
+    "hp": [170, 190, 210],
+    "types": ["Normal"],
+    "atks": [
+        { "n": "Pfund", "d": 60, "s": 1, "t": "Normal" },
+        { "n": "Pfund", "d": 70, "s": 2, "t": "Normal" },
+        { "n": "Gesang", "effect": "sleep", "s": 2, "t": "Normal" },
+        { "n": "Duplexhieb (5x)", "d": 30, "s": 3, "t": "Normal", "m": 5 } 
+    ]
+},
+"Pixi": {
+    "icon": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/036.png",
+    "kat": 3,
+    "hp": [210, 230, 250],
+    "types": ["Normal"],
+    "atks": [
+        { "n": "Duplexhieb (5x)", "d": 40, "s": 1, "t": "Normal", "m": 5 }, 
+        { "n": "Duplexhieb (5x)", "d": 45, "s": 2, "t": "Normal", "m": 5 }, 
+        { "n": "Gesang", "effect": "sleep", "s": 2, "t": "Normal" },
+        { "n": "Sternenhieb", "d": 110, "s": 3, "t": "Normal" }
+    ]
+},
+"Hoothoot": {
+    "icon": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/163.png",
+    "kat": 1,
+    "hp": [140, 160, 180],
+    "types": ["Normal", "Flug"],
+    "atks": [
+        { "n": "Tackle", "d": 40, "s": 1, "t": "Normal" },
+        { "n": "Schnabel", "d": 55, "s": 2, "t": "Flug" },
+        { "n": "Konfusion", "d": 60, "s": 3, "t": "Psycho" },
+        { "n": "Hypnose", "s": 3, "t": "Psycho", "effect": "Gegner schläft" }
+    ]
+},
+"Noctuh": {
+    "icon": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/164.png",
+    "kat": 2,
+    "hp": [210, 230, 250],
+    "types": ["Normal", "Flug"],
+    "atks": [
+        { "n": "Konfusion", "d": 90, "s": 1, "t": "Psycho" },
+        { "n": "Hypnose", "s": 1, "t": "Psycho", "effect": "Gegner schläft" },
+        { "n": "Luftschnitt", "d": 105, "s": 2, "t": "Flug" },
+        { "n": "Traumfresser", "d": 110, "s": 3, "t": "Psycho" }
+    ]
+},
+      "Togepi": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/175.png",
+        kat: 2,
+        hp: [160, 180, 200],
+        types: ["Normal"],
+        atks: [
+            { n: "Tackle", d: 60, s: 1, t: "Normal" },
+            { n: "Bitterkuss", s: 2, t: "Normal", effect: "confuse" },
+            { n: "Risikotackle", d: 100, s: 3, t: "Normal" },
+            { n: "Antik-Kraft", d: 80, s: 3, t: "Gestein" }
+        ]
+    },
+    "Togetic": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/176.png",
+        kat: 3,
+        hp: [210, 130, 250],
+        types: ["Normal", "Flug"],
+        atks: [
+            { n: "Bitterkuss", s: 1, t: "Normal", effect: "confuse" },
+            { n: "Risikotackle", d: 110, s: 1, t: "Normal" },
+            { n: "Seher", d: 120, s: 2, t: "Psycho" },
+            { n: "Himmelsfeger", d: 140, s: 3, t: "Flug" }
+        ]
+    },
+    "Dummisel": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/206.png",
+        kat: 2,
+        hp: [170, 190, 210],
+        types: ["Normal"],
+        atks: [
+            { n: "Raserei", d: 60, s: 1, t: "Normal" },
+            { n: "Raserei", d: 70, s: 2, t: "Normal" },
+            { n: "Bodycheck", d: 100, s: 3, t: "Normal" },
+            { n: "Verfolgung", d: 80, s: 3, t: "Unlicht" }
+        ]
+    },
+    "Rattfratz": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/19.png",
+        kat: 1,
+        hp: [140, 160, 180],
+        types: ["Normal"],
+        atks: [
+            { n: "Tackle", d: 30, s: 1, t: "Normal" },
+            { n: "Tackle", d: 40, s: 2, t: "Normal" },
+            { n: "Ruckzuckhieb", d: 60, s: 3, t: "Normal" }
+        ]
+    },
+    "Rattikarl": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/20.png",
+        kat: 2,
+        hp: [190, 210, 230],
+        types: ["Normal"],
+        atks: [
+            { n: "Ruckzuckhieb", d: 70, s: 1, t: "Normal" },
+            { n: "Hyperzahn", d: 80, s: 1, t: "Normal" },
+            { n: "Hyperzahn", d: 90, s: 2, t: "Normal" },
+            { n: "Superzahn", d: 120, s: 3, t: "Normal" },
+            { n: "Tiefschlag", d: 95, s: 3, t: "Unlicht" }
+        ]
+    },
+  "Damhirplex": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/234.png",
+        kat: 2,
+        hp: [190, 210, 230],
+        types: ["Normal"],
+        atks: [
+            { n: "Stampfer", d: 60, s: 1, t: "Normal" },
+            { n: "Hypnose", s: 1, t: "Psycho", effect: "sleep" },
+            { n: "Erstauner", d: 70, s: 2, t: "Geist" },
+            { n: "Bodycheck", d: 90, s: 3, t: "Normal" },
+            { n: "Konfusstrahl", s: 3, t: "Geist", effect: "confuse" }
+        ]
+    },
+    "Mauzi": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/52.png",
+        kat: 2,
+        hp: [140, 160, 180],
+        types: ["Normal"],
+        atks: [
+            { n: "Kratzer", d: 40, s: 1, t: "Normal" },
+            { n: "Biss", d: 50, s: 2, t: "Unlicht" },
+            { n: "Kratzfurie", d: 35, s: 3, t: "Normal", m: 5 },
+            { n: "Biss", d: 60, s: 3, t: "Unlicht" }
+        ]
+    },
+    "Snobilikat": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/53.png",
+        kat: 3,
+        hp: [210, 230, 250],
+        types: ["Normal"],
+        atks: [
+            { n: "Kratzfurie", d: 40, s: 1, t: "Normal", m: 5 },
+            { n: "Biss", d: 80, s: 1, t: "Unlicht" },
+            { n: "Finte", d: 100, s: 2, t: "Unlicht" },
+            { n: "Schlitzer", d: 110, s: 3, t: "Normal" },
+            { n: "Finte", d: 120, s: 3, t: "Unlicht" }
+        ]
+    },
+      "Ditto": {
+    icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/132.png",
+    kat: 1,
+    hp: [180, 200, 220],
+    types: ["Normal"],
+    atks: [
+        { n: "Wandler", s: 1, t: "Normal", effect: "transform" },
+        { n: "Wandler", s: 2, t: "Normal", effect: "transform" },
+        { n: "Wandler", s: 3, t: "Normal", effect: "transform" }
+    ]
+},
+ "Icognito": {
+    "icon": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/201.png",
+    "kat": 1,
+    "hp": [120, 140, 160],
+    "types": ["Psycho"],
+    "atks": [
+         { n: "Kraftreserve", d: 20, s: 1, t: "Psycho" },
+         { n: "Kraftreserve", d: 30, s: 2, t: "Psycho" },
+         { n: "Kraftreserve", d: 40, s: 3, t: "Psycho" },
+    ]
+},
+     "Kangama": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/115.png",
+        kat: 3,
+        hp: [250, 270, 290],
+        types: ["Normal"],
+        atks: [
+            { n: "Kometenhieb", d: 100, s: 1, t: "Normal" },
+            { n: "Biss", d: 90, s: 1, t: "Unlicht" },
+            { n: "Knirscher", d: 130, s: 2, t: "Unlicht" },
+            { n: "Megahieb", d: 110, s: 3, t: "Normal" },
+            { n: "Wutanfall", d: 120, s: 3, t: "Drache" }
+        ]
+    },
+    "Porenta": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/83.png",
+        kat: 2,
+        hp: [170, 190, 210],
+        types: ["Normal", "Flug"],
+        atks: [
+            { n: "Schnabel", d: 70, s: 1, t: "Flug" },
+            { n: "Abschlag", d: 90, s: 2, t: "Unlicht" },
+            { n: "Schlitzer", d: 90, s: 3, t: "Normal" }
+        ]
+    },
+    "Schlurp": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/108.png",
+        kat: 2,
+        hp: [190, 210, 230],
+        types: ["Normal"],
+        atks: [
+            { n: "Wickel", d: 70, s: 1, t: "Normal" },
+            { n: "Abschlag", d: 60, s: 1, t: "Unlicht" },
+            { n: "Schlecker", d: 70, s: 2, t: "Geist" },
+            { n: "Slam", d: 100, s: 3, t: "Normal" },
+            { n: "Schlecker", d: 80, s: 3, t: "Geist" }
+        ]
+    },
+      "Griffel": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/190.png",
+        kat: 2,
+        hp: [170, 190, 210],
+        types: ["Normal"],
+        atks: [
+            { n: "Kratzer", d: 40, s: 1, t: "Normal" },
+            { n: "Kratzfurie", d: 35, s: 2, t: "Normal", m: 5 },
+            { n: "Sternschauer", d: 70, s: 3, t: "Normal" },
+            { n: "Kratzfurie", d: 40, s: 3, t: "Normal", m: 5 }
+        ]
+    },
+    "Snubbull": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/209.png",
+        kat: 1,
+        hp: [140, 160, 180],
+        types: ["Normal"],
+        atks: [
+            { n: "Tackle", d: 40, s: 1, t: "Normal" },
+            { n: "Biss", d: 50, s: 2, t: "Unlicht" },
+            { n: "Raserei", d: 60, s: 3, t: "Normal" },
+            { n: "Schlecker", d: 50, s: 3, t: "Geist" }
+        ]
+    },
+    "Granbull": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/210.png",
+        kat: 2,
+        hp: [190, 210, 230],
+        types: ["Normal"],
+        atks: [
+            { n: "Biss", d: 70, s: 1, t: "Unlicht" },
+            { n: "Schlecker", d: 65, s: 1, t: "Geist" },
+            { n: "Biss", d: 80, s: 2, t: "Unlicht" },
+            { n: "Bodycheck", d: 100, s: 3, t: "Normal" },
+            { n: "Schlecker", d: 90, s: 3, t: "Geist" }
+        ]
+    },
+      "Tauros": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/128.png",
+        kat: 3,
+        hp: [240, 260, 280],
+        types: ["Normal"],
+        atks: [
+            { n: "Hornattacke", d: 130, s: 1, t: "Normal" },
+            { n: "Raserei", d: 110, s: 2, t: "Normal" },
+            { n: "Hornattacke", d: 125, s: 3, t: "Normal" },
+            { n: "Bodycheck", d: 115, s: 3, t: "Normal" }
+        ]
+    },
+    "Teddiursa": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/216.png",
+        kat: 1,
+        hp: [140, 160, 180],
+        types: ["Normal"],
+        atks: [
+            { n: "Kratzer", d: 35, s: 1, t: "Normal" },
+            { n: "Schlecker", d: 45, s: 2, t: "Geist" },
+            { n: "Kratzfurie", d: 25, s: 3, t: "Normal", m: 5 },
+            { n: "Finte", d: 60, s: 3, t: "Unlicht" }
+        ]
+    },
+    "Ursaring": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/217.png",
+        kat: 3,
+        hp: [240, 260, 280],
+        types: ["Normal"],
+        atks: [
+            { n: "Finte", d: 90, s: 1, t: "Unlicht" },
+            { n: "Kratzfurie", d: 40, s: 1, t: "Normal", m: 5 },
+            { n: "Schlitzer", d: 120, s: 2, t: "Normal" },
+            { n: "Fuchtler", d: 140, s: 3, t: "Normal" }
+        ]
+    },
+      "Evoli": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/133.png",
+        kat: 1,
+        hp: [140, 160, 180],
+        levelWins: [2, 3, 3],
+        types: ["Normal"],
+        atks: [
+            { n: "Tackle", d: 40, s: 1, t: "Normal" },
+            { n: "Ruckzuckhieb", d: 50, s: 2, t: "Normal" },
+            { n: "Ruckzuckhieb", d: 60, s: 3, t: "Normal" },
+            { n: "Biss", d: 70, s: 3, t: "Unlicht" }
+        ]
+    },
+"Relaxo": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/143.png",
+        kat: 4,
+        hp: [270, 290, 310],
+        types: ["Normal"],
+        atks: [
+            { n: "Kopfnuss", d: 95, s: 1, t: "Normal" },
+            { n: "Genesung", d: 0, s: 1, t: "Psycho", effect: "heal" }, 
+            { n: "Bodyslam", d: 110, s: 2, t: "Normal" },
+            { n: "Genesung", d: 0, s: 3, t: "Psycho", effect: "heal" },
+            { n: "Hyperstrahl", d: 160, s: 3, t: "Normal" }
+        ]
+    },
+      "Mew": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/151.png",
+        kat: 4,
+        hp: [240, 260, 280],
+        types: ["Psycho"],
+        atks: [
+            { n: "Pfund", d: 130, s: 1, t: "Normal" },
+            { n: "Psychokinese", d: 130, s: 1, t: "Psycho" },
+            { n: "Megahieb", d: 150, s: 2, t: "Normal" },
+            { n: "Antik-Kraft", d: 140, s: 2, t: "Gestein" },
+            { n: "Psychokinese", d: 150, s: 3, t: "Psycho" }
+        ]
+    },
+    "Mewtu": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/150.png",
+        kat: 4,
+        hp: [240, 260, 280],
+        types: ["Psycho"],
+        atks: [
+            { n: "Seher", d: 160, s: 1, t: "Psycho" },
+            { n: "Konfusion", d: 140, s: 1, t: "Psycho" },
+            { n: "Psychoklinge", d: 145, s: 2, t: "Psycho" },
+            { n: "Psychokinese", d: 155, s: 3, t: "Psycho" },
+            { n: "Aurasphäre", d: 145, s: 3, t: "Kampf" }
+        ]
+    },
+    "Lugia": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/249.png",
+        kat: 4,
+        hp: [260, 280, 300],
+        types: ["Psycho", "Flug"],
+        atks: [
+            { n: "Windstoß", d: 120, s: 1, t: "Flug" },
+            { n: "Drachenstoß", d: 130, s: 1, t: "Drache" },
+            { n: "Hydropumpe", d: 135, s: 2, t: "Wasser" },
+            { n: "Sondersensor", d: 125, s: 2, t: "Psycho" },
+            { n: "Himmelsfeger", d: 170, s: 3, t: "Flug" },
+            { n: "Strafattacke", d: 130, s: 3, t: "Unlicht" }
+        ]
+    },
+      "Natu": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/177.png",
+        kat: 2,
+        hp: [140, 160, 180],
+        types: ["Psycho", "Flug"],
+        atks: [
+            { n: "Schnabel", d: 55, s: 1, t: "Flug" },
+            { n: "Nachtnebel", d: 70, s: 2, t: "Geist" },
+            { n: "Seher", d: 75, s: 3, t: "Psycho" }
+        ]
+    },
+    "Xatu": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/178.png",
+        kat: 3,
+        hp: [190, 210, 230],
+        types: ["Psycho", "Flug"],
+        atks: [
+            { n: "Schnabel", d: 80, s: 1, t: "Flug" },
+            { n: "Nachtnebel", d: 80, s: 1, t: "Geist" },
+            { n: "Konfusstrahl", d: 0, s: 2, t: "Geist", effect: "confuse" },
+            { n: "Psychokinese", d: 110, s: 3, t: "Psycho" }
+        ]
+    },
+    "Psiana": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/196.png",
+        kat: 3,
+        hp: [200, 220, 240],
+        types: ["Psycho"],
+        atks: [
+            { n: "Ruckzuckhieb", d: 95, s: 1, t: "Normal" },
+            { n: "Konfusion", d: 95, s: 1, t: "Psycho" },
+            { n: "Psystrahl", d: 100, s: 2, t: "Psycho" },
+            { n: "Psychokinese", d: 120, s: 3, t: "Psycho" },
+            { n: "Sternschauer", d: 110, s: 3, t: "Normal" }
+        ]
+    },
+      "Pantimos": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/122.png",
+        kat: 2,
+        hp: [170, 190, 210],
+        types: ["Psycho"],
+        atks: [
+            { n: "Duplexhieb", d: 50, s: 1, t: "Normal", m: 2 },
+            { n: "Konfusion", d: 110, s: 2, t: "Psycho" },
+            { n: "Konfusion", d: 120, s: 3, t: "Psycho" }
+        ]
+    },
+      "Traumato": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/96.png",
+        kat: 2,
+        hp: [200, 220, 240],
+        types: ["Psycho"],
+        atks: [
+            { n: "Pfund", d: 50, s: 1, t: "Normal" },
+            { n: "Hypnose", d: 0, s: 2, t: "Psycho", effect: "sleep" },
+            { n: "Kopfnuss", d: 70, s: 3, t: "Normal" },
+            { n: "Psystrahl", d: 75, s: 3, t: "Psycho" }
+        ]
+    },
+    "Hypno": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/97.png",
+        kat: 3,
+        hp: [240, 260, 280],
+        types: ["Psycho"],
+        atks: [
+            { n: "Kopfnuss", d: 100, s: 1, t: "Normal" },
+            { n: "Psystrahl", d: 90, s: 1, t: "Psycho" },
+            { n: "Hypnose", d: 0, s: 2, t: "Psycho", effect: "sleep" },
+            { n: "Psychokinese", d: 110, s: 3, t: "Psycho" },
+            { n: "Seher", d: 120, s: 3, t: "Psycho" }
+        ]
+    },
+      "Abra": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/63.png",
+        kat: 1,
+        hp: [120, 140, 160],
+        types: ["Psycho"],
+        atks: [
+            { n: "Konfusion", d: 30, s: 1, t: "Psycho" },
+            { n: "Konfusion", d: 40, s: 2, t: "Psycho" },
+            { n: "Konfusion", d: 50, s: 3, t: "Psycho" }
+        ]
+    },
+    "Kadabra": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/64.png",
+        kat: 2,
+        hp: [170, 190, 210],
+        types: ["Psycho"],
+        atks: [
+            { n: "Konfusion", d: 70, s: 1, t: "Psycho" },
+            { n: "Psystrahl", d: 80, s: 2, t: "Psycho" },
+            { n: "Genesung", d: 0, s: 3, t: "Normal", effect: "heal" },
+            { n: "Psychoklinge", d: 90, s: 3, t: "Psycho" }
+        ]
+    },
+    "Simsala": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/65.png",
+        kat: 3,
+        hp: [220, 240, 260],
+        types: ["Psycho"],
+        atks: [
+            { n: "Genesung", d: 0, s: 1, t: "Normal", effect: "heal" },
+            { n: "Psychoklinge", d: 110, s: 1, t: "Psycho" },
+            { n: "Psychokinese", d: 110, s: 2, t: "Psycho" },
+            { n: "Psychokinese", d: 120, s: 3, t: "Psycho" },
+            { n: "Genesung", d: 0, s: 3, t: "Normal", effect: "heal" }
+        ]
+    },
+      "Woingenau": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/202.png",
+        kat: 2,
+        hp: [200, 220, 240],
+        types: ["Psycho"],
+        atks: [
+            { n: "Konter", s: 1, t: "Normal", effect: "counter" },
+            { n: "Spiegelcape", s: 2, t: "Psycho", effect: "counter" },
+            { n: "Konter", s: 3, t: "Normal", effect: "counter" },
+            { n: "Spiegelcape", s: 3, t: "Psycho", effect: "counter" }
+        ]
+    },
+      "Karnimani": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/158.png",
+        kat: 1,
+        hp: [140, 160, 180],
+        types: ["Wasser"],
+        atks: [
+            { n: "Kratzer", d: 40, s: 1, t: "Normal" },
+            { n: "Raserei", d: 50, s: 2, t: "Normal" },
+            { n: "Aquaknarre", d: 70, s: 3, t: "Wasser" },
+            { n: "Raserei", d: 60, s: 3, t: "Normal" }
+        ]
+    },
+    "Tyracroc": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/159.png",
+        kat: 2,
+        hp: [190, 210, 230],
+        types: ["Wasser"],
+        atks: [
+            { n: "Aquaknarre", d: 65, s: 1, t: "Wasser" },
+            { n: "Biss", d: 75, s: 1, t: "Unlicht" },
+            { n: "Eiszahn", d: 85, s: 2, t: "Eis" },
+            { n: "Aquaknarre", d: 90, s: 3, t: "Wasser" },
+            { n: "Fuchtler", d: 100, s: 3, t: "Normal" }
+        ]
+    },
+    "Impergator": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/160.png",
+        kat: 3,
+        hp: [240, 260, 280],
+        types: ["Wasser"],
+        atks: [
+            { n: "Hydropumpe", d: 110, s: 1, t: "Wasser" },
+            { n: "Eiszahn", d: 105, s: 1, t: "Eis" },
+            { n: "Knirscher", d: 115, s: 2, t: "Unlicht" },
+            { n: "Nassschweif", d: 125, s: 3, t: "Wasser" },
+            { n: "Kraftkoloss", d: 145, s: 3, t: "Kampf" }
+        ]
+    },
+      "Schiggy": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/7.png",
+        kat: 1,
+        hp: [140, 160, 180],
+        types: ["Wasser"],
+        atks: [
+            { n: "Tackle", d: 40, s: 1, t: "Normal" },
+            { n: "Blubber", d: 50, s: 2, t: "Wasser" },
+            { n: "Turbodreher", d: 70, s: 3, t: "Normal" },
+            { n: "Blubber", d: 60, s: 3, t: "Wasser" }
+        ]
+    },
+    "Schillok": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/8.png",
+        kat: 2,
+        hp: [190, 210, 230],
+        types: ["Wasser"],
+        atks: [
+            { n: "Turbodreher", d: 75, s: 1, t: "Normal" },
+            { n: "Aquaknarre", d: 65, s: 1, t: "Wasser" },
+            { n: "Aquawelle", d: 75, s: 2, t: "Wasser" },
+            { n: "Schädelwumme", d: 95, s: 3, t: "Normal" },
+            { n: "Hydropumpe", d: 110, s: 3, t: "Wasser" }
+        ]
+    },
+    "Turtok": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/9.png",
+        kat: 3,
+        hp: [250, 270, 290],
+        types: ["Wasser"],
+        atks: [
+            { n: "Schädelwumme", d: 110, s: 1, t: "Normal" },
+            { n: "Hydropumpe", d: 100, s: 1, t: "Wasser" },
+            { n: "Nassschweif", d: 115, s: 2, t: "Wasser" },
+            { n: "Schädelwumme", d: 135, s: 3, t: "Normal" },
+            { n: "Hydropumpe", d: 115, s: 3, t: "Wasser" }
+        ]
+    },
+      "Lapras": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/131.png",
+        kat: 3,
+        hp: [240, 260, 280],
+        types: ["Wasser", "Eis"],
+        atks: [
+            { n: "Aquaknarre", d: 95, s: 1, t: "Wasser" },
+            { n: "Konfusstrahl", d: 0, s: 1, t: "Geist", effect: "confuse" },
+            { n: "Eisstrahl", d: 100, s: 2, t: "Eis" },
+            { n: "Hydropumpe", d: 110, s: 3, t: "Wasser" },
+            { n: "Eiseskälte", d: 140, s: 3, t: "Eis" }
+        ]
+    },
+      "Felino": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/194.png",
+        kat: 1,
+        hp: [130, 150, 170],
+        types: ["Wasser", "Boden"],
+        atks: [
+            { n: "Aquaknarre", d: 40, s: 1, t: "Wasser" },
+            { n: "Slam", d: 60, s: 2, t: "Normal" },
+            { n: "Aquaknarre", d: 60, s: 3, t: "Wasser" },
+            { n: "Lehmschuss", d: 70, s: 3, t: "Boden" }
+        ]
+    },
+    "Morlord": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/195.png",
+        kat: 2,
+        hp: [200, 220, 240],
+        types: ["Wasser", "Boden"],
+        atks: [
+            { n: "Aquaknarre", d: 80, s: 1, t: "Wasser" },
+            { n: "Lehmschuss", d: 90, s: 1, t: "Boden" },
+            { n: "Slam", d: 100, s: 2, t: "Normal" },
+            { n: "Aquaknarre", d: 95, s: 3, t: "Wasser" },
+            { n: "Erdbeben", d: 115, s: 3, t: "Boden" }
+        ]
+    },
+      "Quapsel": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/60.png",
+        kat: 1,
+        hp: [140, 160, 180],
+        types: ["Wasser"],
+        atks: [
+            { n: "Blubber", d: 35, s: 1, t: "Wasser" },
+            { n: "Hypnose", d: 0, s: 1, t: "Psycho", effect: "sleep" },
+            { n: "Blubber", d: 45, s: 2, t: "Wasser" },
+            { n: "Duplexhieb", d: 60, s: 3, t: "Normal" },
+            { n: "Aquaknarre", d: 60, s: 3, t: "Wasser" }
+        ]
+    },
+    "Quaputzi": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/61.png",
+        kat: 2,
+        hp: [190, 210, 230],
+        types: ["Wasser"],
+        atks: [
+            { n: "Aquaknarre", d: 60, s: 1, t: "Wasser" },
+            { n: "Hypnose", d: 0, s: 1, t: "Psycho", effect: "sleep" },
+            { n: "Bodyslam", d: 70, s: 2, t: "Normal" },
+            { n: "Hydropumpe", d: 105, s: 3, t: "Wasser" }
+        ]
+    },
+    "Quappo": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/62.png",
+        kat: 3,
+        hp: [240, 260, 280],
+        types: ["Wasser", "Kampf"],
+        atks: [
+            { n: "Hydropumpe", d: 100, s: 1, t: "Wasser" },
+            { n: "Hypnose", d: 0, s: 1, t: "Psycho", effect: "sleep" },
+            { n: "Überroller", d: 110, s: 2, t: "Kampf" },
+            { n: "Wuchtschlag", d: 140, s: 3, t: "Kampf" },
+            { n: "Hydropumpe", d: 120, s: 3, t: "Wasser" }
+        ]
+    },
+      "Quaxo": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/186.png",
+        kat: 2,
+        hp: [170, 190, 210],
+        types: ["Wasser"],
+        atks: [
+            { n: "Aquaknarre", d: 70, s: 1, t: "Wasser" },
+            { n: "Hypnose", d: 0, s: 1, t: "Psycho", effect: "sleep" },
+            { n: "Duplexhieb (5x)", d: 30, s: 2, t: "Normal", m: 2 },  
+            { n: "Aquaknarre", d: 80, s: 3, t: "Wasser" }
+        ]
+    },
+    "Suicune": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/245.png",
+        kat: 4, // Legendär
+        hp: [250, 270, 290],
+        types: ["Wasser"],
+        atks: [
+            { n: "Biss", d: 115, s: 1, t: "Unlicht" },
+            { n: "Hydropumpe", d: 125, s: 1, t: "Wasser" },
+            { n: "Aurorastahl", d: 130, s: 2, t: "Eis" },
+            { n: "Hydropumpe", d: 140, s: 3, t: "Wasser" },
+            { n: "Blizzard", d: 165, s: 3, t: "Eis" }
+        ]
+    },
+      "Karpador": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/129.png",
+        kat: 1,
+        hp: [130, 150, 170],
+        types: ["Wasser"],
+        atks: [
+            { n: "Tackle", d: 30, s: 1, t: "Normal" },
+            { n: "Tackle", d: 40, s: 2, t: "Normal" },
+            { n: "Dreschflegel", d: 65, s: 3, t: "Normal" }
+        ]
+    },
+    "Garados": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/130.png",
+        kat: 4,
+        hp: [240, 260, 280],
+        types: ["Wasser", "Flug"],
+        atks: [
+            { n: "Drachenwut", d: 105, s: 1, t: "Drache" },
+            { n: "Nassschweif", d: 115, s: 1, t: "Wasser" },
+            { n: "Windose", d: 120, s: 2, t: "Flug" },
+            { n: "Hydropumpe", d: 125, s: 3, t: "Wasser" },
+            { n: "Hyperstrahl", d: 145, s: 3, t: "Normal" }
+        ]
+    },
+      "Goldini": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/118.png",
+        kat: 1,
+        hp: [140, 160, 180],
+        types: ["Wasser"],
+        atks: [
+            { n: "Hornattacke", d: 35, s: 1, t: "Normal" },
+            { n: "Hornattacke", d: 45, s: 2, t: "Normal" },
+            { n: "Aquawelle", d: 65, s: 3, t: "Wasser" }
+        ]
+    },
+    "Golking": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/119.png",
+        kat: 2,
+        hp: [190, 210, 230],
+        types: ["Wasser"],
+        atks: [
+            { n: "Hornattacke", d: 60, s: 1, t: "Normal" },
+            { n: "Aquawelle", d: 70, s: 1, t: "Wasser" },
+            { n: "Hornbohrer", d: 120, s: 2, t: "Normal" },
+            { n: "Kaskade", d: 90, s: 3, t: "Wasser" },
+            { n: "Superschall", d: 0, s: 3, t: "Normal", effect: "confuse" }
+        ]
+    },
+      "Flegmon": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/79.png",
+        kat: 1,
+        hp: [140, 160, 180],
+        types: ["Wasser", "Psycho"],
+        atks: [
+            { n: "Tackle", d: 40, s: 1, t: "Normal" },
+            { n: "Tackle", d: 50, s: 2, t: "Normal" },
+            { n: "Konfusion", d: 65, s: 3, t: "Psycho" },
+            { n: "Aquaknarre", d: 65, s: 3, t: "Wasser" }
+        ]
+    },
+    "Lahmus": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/80.png",
+        kat: 2,
+        hp: [190, 210, 230],
+        types: ["Wasser", "Psycho"],
+        atks: [
+            { n: "Aquaknarre", d: 70, s: 1, t: "Wasser" },
+            { n: "Konfusion", d: 70, s: 1, t: "Psycho" },
+            { n: "Kopfnuss", d: 100, s: 2, t: "Normal" },
+            { n: "Zen-Kopfstoß", d: 110, s: 3, t: "Psycho" },
+            { n: "Aquawelle", d: 105, s: 3, t: "Wasser" }
+        ]
+    },
+    "Laschoking": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/199.png",
+        kat: 3,
+        hp: [240, 260, 280],
+        types: ["Wasser", "Psycho"],
+        atks: [
+            { n: "Aquawelle", d: 95, s: 1, t: "Wasser" },
+            { n: "Zen-Kopfstoß", d: 115, s: 1, t: "Psycho" },
+            { n: "Juwelenkraft", d: 100, s: 2, t: "Gestein" },
+            { n: "Psychokinese", d: 135, s: 3, t: "Psycho" },
+            { n: "Aquawelle", d: 110, s: 3, t: "Wasser" }
+        ]
+    },
+      "Marill": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/183.png",
+        kat: 1,
+        hp: [140, 160, 180],
+        types: ["Wasser"],
+        atks: [
+            { n: "Tackle", d: 40, s: 1, t: "Normal" },
+            { n: "Tackle", d: 50, s: 2, t: "Normal" },
+            { n: "Aquaknarre", d: 65, s: 3, t: "Wasser" }
+        ]
+    },
+    "Azumarill": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/184.png",
+        kat: 2,
+        hp: [190, 210, 230],
+        types: ["Wasser"],
+        atks: [
+            { n: "Aquaknarre", d: 65, s: 1, t: "Wasser" },
+            { n: "Blubbstrahl", d: 70, s: 2, t: "Wasser" },
+            { n: "Risikotackle", d: 115, s: 3, t: "Normal" },
+            { n: "Hydropumpe", d: 95, s: 3, t: "Wasser" }
+        ]
+    },
+      "Enton": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/54.png",
+        kat: 2,
+        hp: [140, 160, 180],
+        types: ["Wasser"],
+        atks: [
+            { n: "Kratzer", d: 40, s: 1, t: "Normal" },
+            { n: "Konfusion", d: 70, s: 2, t: "Psycho" },
+            { n: "Aquaknarre", d: 75, s: 3, t: "Wasser" },
+            { n: "Konfusion", d: 60, s: 3, t: "Psycho" }
+        ]
+    },
+    "Entoron": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/55.png",
+        kat: 3,
+        hp: [190, 210, 230],
+        types: ["Wasser"],
+        atks: [
+            { n: "Aquaknarre", d: 65, s: 1, t: "Wasser" },
+            { n: "Konfusion", d: 70, s: 1, t: "Psycho" },
+            { n: "Kratzfurie", d: 35, s: 2, t: "Normal", m: 5 },
+            { n: "Hydropumpe", d: 100, s: 3, t: "Wasser" }
+        ]
+    },
+  "Baldorfish": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/211.png",
+        kat: 2,
+        hp: [180, 200, 220],
+        types: ["Wasser", "Gift"],
+        atks: [
+            { n: "Giftstachel (-5)", d: 45, s: 1, t: "Gift", effect: "poison" },
+            { n: "Aquaknarre", d: 65, s: 1, t: "Wasser" },
+            { n: "Nadelrakete", d: 35, s: 2, t: "Käfer", m: 5 },
+            { n: "Hydropumpe", d: 85, s: 3, t: "Wasser" }
+        ]
+    },
+
+    "Tentacha": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/72.png",
+        kat: 1,
+        hp: [140, 160, 180],
+        types: ["Wasser", "Gift"],
+        atks: [
+            { n: "Säure", d: 35, s: 1, t: "Gift" },
+            { n: "Umklammerung", d: 40, s: 1, t: "Normal" },
+            { n: "Blubbstrahl", d: 50, s: 2, t: "Wasser" },
+            { n: "Säure", d: 60, s: 3, t: "Gift" }
+        ]
+    },
+    "Tentoxa": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/73.png",
+        kat: 3,
+        hp: [210, 230, 250],
+        types: ["Wasser", "Gift"],
+        atks: [
+            { n: "Säure", d: 80, s: 1, t: "Gift" },
+            { n: "Blubbstrahl", d: 90, s: 1, t: "Wasser" },
+            { n: "Wickel", d: 90, s: 2, t: "Normal" },
+            { n: "Hydropumpe", d: 105, s: 3, t: "Wasser" }
+        ]
+    },
+      "Krabby": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/98.png",
+        kat: 1,
+        hp: [140, 160, 180],
+        types: ["Wasser"],
+        atks: [
+            { n: "Blubber", d: 40, s: 1, t: "Wasser" },
+            { n: "Blubber", d: 45, s: 2, t: "Wasser" },
+            { n: "Klammer", d: 55, s: 3, t: "Normal" },
+            { n: "Blubbstrahl", d: 60, s: 3, t: "Wasser" }
+        ]
+    },
+    "Kingler": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/99.png",
+        kat: 3,
+        hp: [220, 240, 260],
+        types: ["Wasser"],
+        atks: [
+            { n: "Blubbstrahl", d: 90, s: 1, t: "Wasser" },
+            { n: "Lehmschuss", d: 105, s: 2, t: "Boden" },
+            { n: "Guillotine", d: 140, s: 3, t: "Normal" },
+            { n: "Krabbhammer", d: 120, s: 3, t: "Wasser" }
+        ]
+    },
+      "Lampi": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/170.png",
+        kat: 2,
+        hp: [140, 160, 180],
+        types: ["Wasser", "Elektro"],
+        atks: [
+            { n: "Blubber", d: 35, s: 1, t: "Wasser" },
+            { n: "Superschall", d: 0, s: 2, t: "Normal", effect: "confuse" },
+            { n: "Funkensprung", d: 75, s: 3, t: "Elektro" },
+            { n: "Aquaknarre", d: 60, s: 3, t: "Wasser" }
+        ]
+    },
+    "Lanturn": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/171.png",
+        kat: 3,
+        hp: [200, 220, 240],
+        types: ["Wasser", "Elektro"],
+        atks: [
+            { n: "Aquaknarre", d: 85, s: 1, t: "Wasser" },
+            { n: "Funkensprung", d: 95, s: 1, t: "Elektro" },
+            { n: "Konfustrahl", d: 0, s: 2, t: "Geist", effect: "confuse" },
+            { n: "Ladungsstoß", d: 125, s: 3, t: "Elektro" },
+            { n: "Hydropumpe", d: 110, s: 3, t: "Wasser" }
+        ]
+    },
+      "Muschas": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/90.png",
+        kat: 1,
+        hp: [140, 160, 180],
+        types: ["Wasser"],
+        atks: [
+            { n: "Tackle", d: 35, s: 1, t: "Normal" },
+            { n: "Tackle", d: 45, s: 2, t: "Normal" },
+            { n: "Aurorastahl", d: 65, s: 3, t: "Eis" }
+        ]
+    },
+    "Austos": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/91.png",
+        kat: 3,
+        hp: [240, 260, 280],
+        types: ["Wasser", "Eis"],
+        atks: [
+            { n: "Aurorastahl", d: 80, s: 1, t: "Eis" },
+            { n: "Lake", d: 90, s: 2, t: "Wasser" },
+            { n: "Eisstrahl", d: 105, s: 3, t: "Eis" },
+            { n: "Lake", d: 95, s: 3, t: "Wasser" }
+        ]
+    },
+    "Aquana": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/134.png",
+        kat: 3,
+        hp: [230, 250, 270],
+        types: ["Wasser"],
+        atks: [
+            { n: "Ruckzuckhieb", d: 80, s: 1, t: "Normal" },
+            { n: "Aquaknarre", d: 75, s: 1, t: "Wasser" },
+            { n: "Biss", d: 80, s: 2, t: "Unlicht" },
+            { n: "Aurorastahl", d: 90, s: 3, t: "Eis" },
+            { n: "Hydropumpe", d: 95, s: 3, t: "Wasser" }
+        ]
+    },
+      "Octillery": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/224.png",
+        kat: 2,
+        hp: [200, 220, 240],
+        types: ["Wasser"],
+        atks: [
+            { n: "Umklammerung", d: 70, s: 1, t: "Normal" },
+            { n: "Aquaknarre", d: 85, s: 1, t: "Wasser" },
+            { n: "Psystrahl", d: 80, s: 2, t: "Psycho" },
+            { n: "Eisstrahl", d: 90, s: 3, t: "Eis" },
+            { n: "Octazooka", d: 120, s: 3, t: "Wasser" }
+        ]
+    },
+    "Corasonn": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/222.png",
+        kat: 2,
+        hp: [190, 210, 230],
+        types: ["Wasser", "Gestein"],
+        atks: [
+            { n: "Tackle", d: 60, s: 1, t: "Normal" },
+            { n: "Blubber", d: 65, s: 1, t: "Wasser" },
+            { n: "Spiegelcape", d: 0, s: 2, t: "Psycho", effect: "counter" },
+            { n: "Felswurf", d: 30, s: 3, t: "Gestein", m: 5 },
+            { n: "Blubbstrahl", d: 80, s: 3, t: "Wasser" }
+        ]
+    },
+      "Jurob": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/86.png",
+        kat: 1,
+        hp: [160, 180, 200],
+        types: ["Wasser"],
+        atks: [
+            { n: "Kopfnuss", d: 45, s: 1, t: "Normal" },
+            { n: "Kopfnuss", d: 50, s: 2, t: "Normal" },
+            { n: "Eissturm", d: 65, s: 3, t: "Eis" }
+        ]
+    },
+    "Jugong": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/87.png",
+        kat: 3,
+        hp: [210, 230, 250],
+        types: ["Wasser", "Eis"],
+        atks: [
+            { n: "Kopfnuss", d: 95, s: 1, t: "Normal" },
+            { n: "Aurorastahl", d: 90, s: 1, t: "Eis" },
+            { n: "Eiseskälte", d: 120, s: 2, t: "Eis" },
+            { n: "Eisstrahl", d: 110, s: 3, t: "Eis" },
+            { n: "Nassschweif", d: 115, s: 3, t: "Wasser" }
+        ]
+    },
+      "Menki": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/56.png",
+        kat: 2,
+        hp: [160, 180, 200],
+        types: ["Kampf"],
+        atks: [
+            { n: "Kratzfurie (5x)", d: 25, s: 1, t: "Normal", m: 5 },
+            { n: "Fußkick", d: 60, s: 2, t: "Kampf" },
+            { n: "Durchbruch", d: 80, s: 3, t: "Kampf" }
+        ]
+    },
+    "Rasaff": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/57.png",
+        kat: 3,
+        hp: [220, 240, 260],
+        types: ["Kampf"],
+        atks: [
+            { n: "Geowurf", d: 120, s: 1, t: "Kampf" },
+            { n: "Kreuzhieb", d: 110, s: 2, t: "Kampf" },
+            { n: "Nahkampf", d: 140, s: 3, t: "Kampf" },
+            { n: "Fuchtler", d: 110, s: 3, t: "Normal" }
+        ]
+    },
+      "Machollo": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/66.png",
+        kat: 1,
+        hp: [130, 150, 170],
+        types: ["Kampf"],
+        atks: [
+            { n: "Fußkick", d: 45, s: 1, t: "Kampf" },
+            { n: "Fußkick", d: 55, s: 2, t: "Kampf" },
+            { n: "Karateschlag", d: 70, s: 3, t: "Kampf" }
+        ]
+    },
+    "Maschock": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/67.png",
+        kat: 2,
+        hp: [180, 200, 220],
+        types: ["Kampf"],
+        atks: [
+            { n: "Karateschlag", d: 75, s: 1, t: "Kampf" },
+            { n: "Geowurf", d: 90, s: 1, t: "Kampf" },
+            { n: "Vergeltung", d: 85, s: 2, t: "Kampf" },
+            { n: "Überwurf", d: 100, s: 3, t: "Kampf" },
+            { n: "Geowurf", d: 115, s: 3, t: "Kampf" },
+        ]
+    },
+    "Machomei": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/68.png",
+        kat: 3,
+        hp: [230, 250, 270],
+        types: ["Kampf"],
+        atks: [
+            { n: "Überroller", d: 105, s: 1, t: "Kampf" },
+            { n: "Geowurf", d: 115, s: 1, t: "Kampf" },
+            { n: "Kreuzhieb", d: 120, s: 2, t: "Kampf" },
+            { n: "Kreuzhieb", d: 120, s: 3, t: "Kampf" },
+            { n: "Wuchtschlag", d: 150, s: 3, t: "Kampf" }
+        ]
+    },
+ "Rabauz": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/236.png",
+        kat: 2,
+        hp: [140, 160, 180],
+        types: ["Kampf"],
+        atks: [
+            { n: "Tackle", d: 55, s: 1, t: "Normal" },
+            { n: "Fußkick", d: 70, s: 2, t: "Kampf" },
+            { n: "Turmkick", d: 100, s: 3, t: "Kampf" }
+        ]
+    },
+    "Kicklee": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/106.png",
+        kat: 3,
+        hp: [210, 230, 250],
+        types: ["Kampf"],
+        atks: [
+            { n: "Turmkick", d: 120, s: 1, t: "Kampf" },
+            { n: "Doppelkick (2x)", d: 65, s: 1, t: "Kampf", m: 2 },
+            { n: "Megakick", d: 120, s: 2, t: "Normal" },
+            { n: "Turmkick", d: 140, s: 3, t: "Kampf" }
+        ]
+    },
+    "Nockchan": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/107.png",
+        kat: 4,
+        hp: [240, 260, 280],
+        types: ["Kampf"],
+        atks: [
+            { n: "Donnerschlag", d: 100, s: 1, t: "Elektro" },
+            { n: "Feuerschlag", d: 90, s: 1, t: "Feuer" },
+            { n: "Megahieb", d: 105, s: 2, t: "Normal" },
+            { n: "Himmelhieb", d: 105, s: 3, t: "Kampf" },
+            { n: "Eishieb", d: 115, s: 3, t: "Eis" }
+        ]
+    },
+      "Kapoera": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/237.png",
+        kat: 3,
+        hp: [220, 240, 260],
+        types: ["Kampf"],
+        atks: [
+            { n: "Dreifachkick (3x)", d: 65, s: 1, t: "Kampf", m: 3 },
+            { n: "Turbodreher", d: 95, s: 1, t: "Normal" },
+            { n: "Verfolgung", d: 110, s: 2, t: "Unlicht" },
+            { n: "Notsituation", d: 150, s: 3, t: "Kampf" }
+        ]
+    },
+    "Stahlos": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/208.png",
+        kat: 3,
+        hp: [300, 300, 300],
+        types: ["Stahl", "Boden"],
+        atks: [
+            { n: "Eisenschweif", d: 105, s: 1, t: "Stahl" },
+            { n: "Felsgrab", d: 105, s: 2, t: "Boden" },
+            { n: "Risikotackle", d: 120, s: 3, t: "Normal" },
+            { n: "Steinkante", d: 115, s: 3, t: "Boden" }
+        ]
+    },
+      "Panzaeron": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/227.png",
+        kat: 3,
+        hp: [240, 260, 280],
+        types: ["Stahl", "Flug"],
+        atks: [
+            { n: "Windschnitt", d: 90, s: 1, t: "Flug" },
+            { n: "Stahlflügel", d: 105, s: 2, t: "Stahl" },
+            { n: "Stahlflügel", d: 110, s: 3, t: "Stahl" },
+            { n: "Schlitzer", d: 120, s: 3, t: "Normal" }
+        ]
+    },
+    "Kramurx": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/198.png",
+        kat: 1,
+        hp: [140, 160, 180],
+        types: ["Unlicht", "Flug"],
+        atks: [
+            { n: "Schnabel", d: 40, s: 1, t: "Flug" },
+            { n: "Verfolgung", d: 50, s: 1, t: "Unlicht" },
+            { n: "Nachtnebel", d: 50, s: 2, t: "Geist" },
+            { n: "Flügelschlag", d: 65, s: 3, t: "Flug" },
+            { n: "Finte", d: 70, s: 3, t: "Unlicht" }
+        ]
+    },
+    "Sniebel": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/215.png",
+        kat: 2,
+        hp: [160, 180, 200],
+        types: ["Unlicht", "Eis"],
+        atks: [
+            { n: "Finte", d: 60, s: 1, t: "Unlicht" },
+            { n: "Ruckzuckhieb", d: 70, s: 2, t: "Normal" },
+            { n: "Eissturm", d: 85, s: 3, t: "Eis" },
+            { n: "Schlitzer", d: 75, s: 3, t: "Normal" }
+        ]
+    },
+      "Hunduster": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/228.png",
+        kat: 2,
+        hp: [150, 170, 190],
+        types: ["Unlicht", "Feuer"],
+        atks: [
+            { n: "Biss", d: 55, s: 1, t: "Unlicht" },
+            { n: "Glut", d: 65, s: 2, t: "Feuer" },
+            { n: "Hitzewelle", d: 90, s: 3, t: "Feuer" },
+            { n: "Raub", d: 75, s: 3, t: "Unlicht" }
+        ]
+    },
+    "Hundemon": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/229.png",
+        kat: 3,
+        hp: [220, 240, 260],
+        types: ["Unlicht", "Feuer"],
+        atks: [
+            { n: "Knirscher", d: 95, s: 1, t: "Unlicht" },
+            { n: "Feuerzahn", d: 105, s: 1, t: "Feuer" },
+            { n: "Flammenwurf", d: 115, s: 2, t: "Feuer" },
+            { n: "Finsteraura", d: 125, s: 3, t: "Unlicht" },
+            { n: "Feuersturm", d: 140, s: 3, t: "Feuer" }
+        ]
+    },
+      "Dratini": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/147.png",
+        kat: 2,
+        hp: [140, 160, 180],
+        types: ["Drache"],
+        atks: [
+            { n: "Wickel", d: 35, s: 1, t: "Normal" },
+            { n: "Windhose", d: 50, s: 2, t: "Drache" },
+            { n: "Windhose", d: 55, s: 3, t: "Drache" }
+        ]
+    },
+    "Dragonir": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/148.png",
+        kat: 3,
+        hp: [190, 210, 230],
+        types: ["Drache"],
+        atks: [
+            { n: "Windhose", d: 70, s: 1, t: "Drache" },
+            { n: "Drachenwut", d: 75, s: 2, t: "Drache" },
+            { n: "Feuerodem", d: 90, s: 3, t: "Drache" }
+        ]
+    },
+    "Dragoran": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/149.png",
+        kat: 4,
+        hp: [240, 260, 280],
+        types: ["Drache", "Flug"],
+        atks: [
+            { n: "Drachenstoß", d: 120, s: 1, t: "Drache" },
+            { n: "Flügelschlag", d: 110, s: 1, t: "Flug" },
+            { n: "Donner", d: 145, s: 2, t: "Elektro" },
+            { n: "Wutanfall (3x)", d: 60, s: 3, t: "Drache", m: 3 },
+            { n: "Hyperstrahl", d: 170, s: 3, t: "Normal" }
+        ]
+    },
+      "Arktos": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/144.png",
+        kat: 4,
+        hp: [260, 280, 300],
+        types: ["Eis", "Flug"],
+        atks: [
+            { n: "Eisstrahl", d: 105, s: 1, t: "Eis" },
+            { n: "Orkan", d: 125, s: 2, t: "Flug" },
+            { n: "Blizzard", d: 120, s: 2, t: "Eis" },
+            { n: "Eiseskälte", d: 130, s: 3, t: "Eis" }
+        ]
+    },
+    "Nachtara": {
+        icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/197.png",
+        kat: 3,
+        hp: [250, 270, 290],
+        types: ["Unlicht"],
+        atks: [
+            { n: "Verfolgung", d: 95, s: 1, t: "Unlicht" },
+            { n: "Bodycheck", d: 105, s: 1, t: "Normal" },
+            { n: "Konfustrahl", d: 0, s: 2, t: "Geist", effect: "confuse" },
+            { n: "Finsteraura", d: 115, s: 3, t: "Unlicht" },
+            { n: "Risikotackle", d: 135, s: 3, t: "Normal" }
+        ]
+    },
+};
+  const evolutions = {
+    "Glumanda": "Glutexo", "Glutexo": "Glurak",
+    "Vulpix": "Vulnona", "Fukano": "Arkani",
+    "Ponita": "Gallopa", "Feurigel": "Igelavar",
+    "Igelavar": "Tornupto", "Magby": "Magmar",
+    "Schneckmag": "Magcargo", "Tragosso": "Knogga",
+    "Sandan": "Sandamer", "Rihorn": "Rizeros",
+    "Phanpy": "Donphan", "Digda": "Digdri",
+    "Elekid": "Elektek", "Magnetilo": "Magneton",
+    "Voltobal": "Lektrobal", "Voltilamm": "Waaty",
+    "Waaty": "Ampharos", "Pichu": "Pikachu",
+    "Pikachu": "Raichu", "Nebulak": "Alpollo",
+    "Alpollo": "Gengar", "Kabuto": "Kabutops",
+    "Larvitar": "Pupitar", "Pupitar": "Despotar",
+    "Amonitas": "Amoroso", "Kleinstein": "Georok",
+    "Georok": "Geowaz", "Smogon": "Smogmog",
+    "Sleima": "Sleimo", "Nidoran♂": "Nidorino",
+    "Nidorino": "Nidoking", "Nidoran♀": "Nidorina",
+    "Nidorina": "Nidoqueen", "Bisasam": "Bisaknosp",
+    "Bisaknosp": "Bisaflor", "Endivie": "Lorblatt",
+    "Lorblatt": "Meganie", "Tangela": "Tangoloss",
+    "Knofensa": "Ultrigaria", "Ultrigaria": "Sarzenia",
+    "Hoppspross": "Hubelupf", "Hubelupf": "Papungha",
+    "Myrapla": "Duflor", "Duflor": ["Giflor", "Blubella"],
+    "Sonnkern": "Sonnflora", "Taubsi": "Tauboga",
+    "Tauboga": "Tauboss","Habitak": "Ibitak",
+    "Wiesor": "Wiesenior", "Pii": "Piepi",
+    "Piepi": "Pixi", "Hoothoot": "Noctuh", "Togepi": "Togetic",
+    "Rattfratz": "Rattikarl", "Mauzi": "Snobilikat", "Snubbull": "Granbull",
+    "Teddiursa": "Ursaring", "Natu": "Xatu", "Traumato": "Hypno",
+    "Abra": "Kadabra", "Kadabra": "Simsala", "Karnimani": "Tyracroc",
+    "Tyracroc": "Impergator", "Schiggy": "Schillok",
+    "Schillok": "Turtok", "Felino": "Morlord",
+    "Quapsel": "Quaputzi", "Quaputzi": "Quappo", "Karpador": "Garados",
+    "Goldini": "Golking", "Flegmon": "Lahmus", "Lahmus": "Laschoking",     
+    "Marill": "Azumarill", "Enton": "Entoron", "Tentacha": "Tentoxa",
+    "Krabby": "Kingler", "Lampi": "Lanturn","Muschas": "Austos",
+    "Jurob": "Jugong", "Menki": "Rasaff", "Machollo": "Maschock",
+    "Maschock": "Machomei", "Onix": "Stahlos", "Rabauz": ["Kicklee", "Nockchan", "Kapoera"],
+    "Hunduster": "Hundemon", 
+    "Evoli": ["Aquana", "Blitza", "Flamara", "Psiana", "Nachtara"],
+    
+    
+    
+};
+let players = [], poolP1 = [], poolP2 = [], activeP1 = null, activeP2 = null, battleMode = 1; 
+    let attackerSide = 1, currentBaseDmg = 0, currentAtkType = "Normal", currentAtkName = ""; 
+    let currentRound = 1;
+    let multiHitCount = 0, multiHitMax = 1, accumulatedHitsDmg = 0, totalCritBonus = 0;
+ 
+    
+    let damageThisRoundP1 = 0;
+    let damageThisRoundP2 = 0;
+  
+  let lastDmgP1 = 0; // Speichert Schaden, den P1 erhalten hat
+  let lastDmgP2 = 0; // Speichert Schaden, den P2 erhalten hat
+
+    function showToast(msg) {
+        const toast = document.getElementById('battleToast'); toast.innerText = msg; toast.style.display = 'block';
+        setTimeout(() => { toast.style.display = 'none'; }, 2000);
+    }
+
+    function createPlayer() { 
+        const id = "p" + Date.now() + Math.random().toString(36).substr(2, 5); 
+        const col = document.createElement('div'); col.className = 'player-col'; col.id = id; 
+        col.innerHTML = ` 
+            <button class="del-btn" onclick="removePlayer('${id}')">&times;</button> 
+            <input type="text" value="SPIELER ${players.length+1}" style="background:none; border:none; color:var(--win); font-weight:bold; width:80%; font-size:18px; outline:none; margin-bottom:12px;"> 
+            <div class="pkmn-list"></div> 
+            <div class="team-ctrl"> 
+                <button class="btn-add-pkmn" onclick="addPkmn('${id}')">+ PKMN</button> 
+                <button class="btn-team-heal" onclick="healTeam('${id}')">TEAM HEILEN</button> 
+            </div>`; 
+        document.getElementById('board').appendChild(col); players.push({id: id}); addPkmn(id); 
+    } 
+
+    function addPkmn(pid) { 
+        const container = document.getElementById(pid).querySelector('.pkmn-list'); const card = document.createElement('div'); 
+        card.className = 'pkmn-card'; card.dataset.stage = "1"; card.dataset.wins = "0"; card.dataset.kat = "1"; card.dataset.maxhp = "140"; card.dataset.poisoned = "false";
+        card.innerHTML = `<button class="del-btn" onclick="this.parentElement.remove()">&times;</button><div style="display:flex; align-items:center;"><img class="pkmn-icon-small" src="${pkBallSprite}"><div style="position:relative; flex-grow:1;"><input type="text" placeholder="Name..." oninput="showSearch(this)" style="background:none; border:none; color:white; border-bottom:1px solid #666; width:90%; outline:none; font-size:15px;"><div class="search-results"></div></div></div><div class="win-track"><div class="win-fill"></div></div><div style="display:flex; justify-content:space-between; align-items:center; margin-top:5px;"><span class="stage-tag">S1</span><div class="hp-box">140</div></div><div class="btn-grid"><button class="btn-action potion" onclick="applyHeal(this, 120)"><img src="${imgTrank}">120</button><button class="btn-action super" onclick="applyHeal(this, 200)"><img src="${imgSuper}">200</button><button class="btn-action hyper" onclick="applyHeal(this, 9999)"><img src="${imgHyper}">MAX</button><button class="btn-action revive" onclick="applyRevive(this, 160)"><img src="${imgBeleber}">160</button><button class="btn-action max-revive" onclick="applyRevive(this, 9999)"><img src="${imgTopBeleber}">MAX</button></div>`; 
+        container.appendChild(card); 
+    }
+
+    function applyHeal(btn, amount) {
+        const card = btn.closest('.pkmn-card');
+        const hpBox = card.querySelector('.hp-box');
+        const maxHp = parseInt(card.dataset.maxhp);
+        let hp = parseInt(hpBox.innerText);
+        if(hp <= 0) return showToast("Pokémon ist besiegt!");
+        hpBox.innerText = Math.min(maxHp, hp + amount);
+        if(activeP1 || activeP2) updateArena();
+    }
+
+    function applyRevive(btn, amount) {
+        const card = btn.closest('.pkmn-card');
+        const hpBox = card.querySelector('.hp-box');
+        const maxHp = parseInt(card.dataset.maxhp);
+        if(parseInt(hpBox.innerText) > 0) return showToast("Pokémon ist noch fit!");
+        hpBox.innerText = Math.min(maxHp, amount);
+        card.dataset.poisoned = "false";
+        card.removeAttribute('data-poison-fresh');
+        if(activeP1 || activeP2) updateArena();
+    }
+
+    function showSearch(input) { 
+        const res = input.nextElementSibling; res.innerHTML = ""; const query = input.value.toLowerCase(); if(!query) { res.style.display="none"; return; } 
+        Object.keys(pokemonDB).filter(n => n.toLowerCase().includes(query)).forEach(name => { 
+            const d = document.createElement('div'); d.className='search-item'; d.innerHTML=`<img src="${pokemonDB[name].icon}" style="height:30px;"> <span style="margin-left:10px;">${name}</span>`; 
+            d.onclick = () => { input.value = name; res.style.display="none"; selectPkmn(input, name); }; res.appendChild(d); 
+        }); res.style.display="block"; 
+    }
+
+    function selectPkmn(input, name) { 
+        const card = input.closest('.pkmn-card'); const data = pokemonDB[name]; card.querySelector('.pkmn-icon-small').src = data.icon; card.dataset.kat = data.kat; 
+        const hpVal = data.hp[0]; card.dataset.maxhp = hpVal; card.querySelector('.hp-box').innerText = hpVal; 
+        card.dataset.stage = "1"; card.dataset.wins = "0"; card.querySelector('.win-fill').style.width = "0%"; card.querySelector('.stage-tag').innerText = "S1";
+    }
+
+    function openBattleSetup() { 
+        poolP1 = []; poolP2 = [];
+        document.getElementById('setupView').style.display='block'; document.getElementById('pkmnSelectView').style.display='none'; document.getElementById('fightView').style.display='none'; document.getElementById('battleOverlay').style.display='flex'; 
+        const s1 = document.getElementById('p1Sel'), s2 = document.getElementById('p2Sel'); s1.innerHTML = s2.innerHTML = ""; 
+        players.forEach(p => { const n = document.getElementById(p.id).querySelector('input').value; s1.innerHTML += `<option value="${p.id}">${n}</option>`; s2.innerHTML += `<option value="${p.id}">${n}</option>`; }); 
+    } 
+
+    function goToPkmnSelection() { 
+        battleMode = parseInt(document.getElementById('modeSel').value); fillSelection('p1PkmnSelect', document.getElementById('p1Sel').value, poolP1); fillSelection('p2PkmnSelect', document.getElementById('p2Sel').value, poolP2); 
+        document.getElementById('setupView').style.display='none'; document.getElementById('pkmnSelectView').style.display='block'; 
+    } 
+
+    function fillSelection(containerId, playerId, pool) { 
+        const cont = document.getElementById(containerId); cont.innerHTML = ""; 
+        document.getElementById(playerId).querySelectorAll('.pkmn-card').forEach(card => { 
+            const item = document.createElement('div'); item.className = 'pkmn-card'; item.style.width="100px"; item.style.textAlign="center"; 
+            item.innerHTML = `<img src="${card.querySelector('.pkmn-icon-small').src}" style="height:45px;"><br><small>${card.querySelector('input').value || '?'}</small>`; 
+            item.onclick = () => { 
+                if(pool.includes(card)) { pool.splice(pool.indexOf(card), 1); item.style.border="1px solid #555"; } 
+                else if(pool.length < battleMode) { pool.push(card); item.style.border= "2px solid var(--win)"; } 
+            }; 
+            cont.appendChild(item); 
+        }); 
+    } 
+
+    function startFight() { 
+        const p1TeamSize = document.getElementById(document.getElementById('p1Sel').value).querySelectorAll('.pkmn-card').length;
+        const p2TeamSize = document.getElementById(document.getElementById('p2Sel').value).querySelectorAll('.pkmn-card').length;
+        const p1Required = Math.min(battleMode, p1TeamSize);
+        const p2Required = Math.min(battleMode, p2TeamSize);
+
+        if(poolP1.length < p1Required || poolP2.length < p2Required) {
+            return alert(`P1 muss ${p1Required} und P2 muss ${p2Required} PKMN wählen!`); 
+        }
+
+        activeP1 = poolP1[0]; activeP2 = poolP2[0]; attackerSide = 1; currentRound = 1;
+        document.getElementById('pkmnSelectView').style.display='none'; document.getElementById('fightView').style.display='block'; 
+        updateArena(); 
+    } 
+
+    function removePlayer(id) { if(confirm("Löschen?")) { document.getElementById(id).remove(); players = players.filter(p => p.id !== id); } }
+
+    function updateArena() { 
+        const pName = attackerSide === 1 ? "SPIELER 1" : "SPIELER 2";
+        document.getElementById('turnIndicator').innerText = `RUNDE ${currentRound} - ${pName} AM ZUG`;
+        renderSlot(1, activeP1, attackerSide === 1); 
+        renderSlot(2, activeP2, attackerSide === 2); 
+        renderBalls(1); renderBalls(2); 
+    }
+    
+    function renderBalls(side) { 
+        const container = document.getElementById(`teamBallsP${side}`); container.innerHTML = ""; 
+        (side === 1 ? poolP1 : poolP2).forEach(p => { 
+            const hp = parseInt(p.querySelector('.hp-box').innerText); const img = document.createElement('img'); 
+            img.src = pkBallSprite; img.className = `pkball-icon ${hp <= 0 ? 'fainted' : ''}`; container.appendChild(img); 
+        }); 
+    }
+
+function renderSlot(side, pkmn, isAttacker) {
+    const slot = document.getElementById(`slotP${side}`); 
+    const currentHp = parseInt(pkmn.querySelector('.hp-box').innerText); 
+    const maxHp = parseInt(pkmn.dataset.maxhp); 
+    const name = pkmn.querySelector('input').value || "PKMN"; 
+    const stage = pkmn.dataset.stage; 
+    const percent = Math.max(0, (currentHp / maxHp) * 100);
+    
+    let hpColor = "var(--success)"; 
+    if(percent < 50) hpColor = "#f1c40f"; 
+    if(percent < 20) hpColor = "#f1c40f"; // Ggf. anpassen
+    if(percent < 20) hpColor = "var(--danger)";
+    
+    const isPoisoned = pkmn.dataset.poisoned === "true";
+    const waitingClass = !isAttacker ? "is-waiting" : "";
+
+    slot.className = `fighter-slot ${isAttacker ? 'is-attacker' : 'is-target'} ${isPoisoned ? 'poisoned' : ''} ${waitingClass}`; 
+    let content = `<img src="${pkmn.querySelector('.pkmn-icon-small').src}" style="height:80px;"><br><b>${name}</b> <span class="stage-tag">S${stage}</span>${isPoisoned ? '<span class="poison-tag">GIFT</span>' : ''}<div class="hp-bar-container"><div class="hp-bar-fill" style="width: ${percent}%; background-color: ${hpColor};"></div></div><div style="font-size: 14px; font-weight: bold;">HP: ${currentHp} / ${maxHp}</div>`; 
+    
+    // Spieler 1 greift zuerst an: ist sein Pokémon zu Rundenbeginn besiegt (z. B. durch Gift), muss er wechseln
+    if(currentHp <= 0 && (attackerSide !== side || side === 1)) {
+        content += `<div class="death-overlay">X</div>`; 
+        setTimeout(() => openSwitchMenu(side, true), 1000); 
+    } 
+    else if(isAttacker) { 
+        let atks = `<div class="atk-grid">`; 
+        
+        // Prüfen ob Ditto transformiert ist
+        const isTransformed = pkmn.dataset.isTransformed === "true";
+        const atkSource = isTransformed ? JSON.parse(pkmn.dataset.transformedAtks) : (pokemonDB[name] ? pokemonDB[name].atks : []);
+
+        if (atkSource) {
+            atkSource.filter(a => a.s <= stage).forEach(a => {
+                // NEU: Wandler nutzt triggerAtk, damit das Würfel-Menü erscheint
+                if (a.n === "Wandler") {
+                    atks += `<button class="atk-btn" onclick="triggerAtk(0, 'Normal', event, 1, 'Wandler')">Wandler</button>`;
+                } else {
+                    atks += `<button class="atk-btn" onclick="triggerAtk(${a.d}, '${a.t}', event, ${a.m || 1}, '${a.n}')">${a.n}<br><b>${a.d}</b></button>`;
+                }
+            });
+        }
+        
+        content += atks + `</div>
+            <div style="display:flex; gap:5px; margin-top:10px;">
+                <button class="btn-switch-arena" style="width:50%;" onclick="openSwitchMenu(${side}, false)">♻️ Wechseln</button>
+                <button class="btn-item-arena" style="width:50%;" onclick="openItemMenu(${side})">🧪 Items</button>
+            </div>`; 
+    } 
+    slot.innerHTML = content; 
+}
+    function openSwitchMenu(side, isForced) { 
+        const menu = document.getElementById('switchMenu'), grid = document.getElementById('switchGrid'); const pool = side === 1 ? poolP1 : poolP2; 
+        if(pool.every(p => parseInt(p.querySelector('.hp-box').innerText) <= 0)) return; 
+        menu.style.display = 'flex'; grid.innerHTML = ""; document.getElementById('cancelSwitch').style.display = isForced ? 'none' : 'block'; 
+        pool.forEach(p => { if(p === (side === 1 ? activeP1 : activeP2)) return; const hp = parseInt(p.querySelector('.hp-box').innerText); const card = document.createElement('div'); card.className = `switch-card ${hp <= 0 ? 'fainted' : ''}`; card.innerHTML = `<img src="${p.querySelector('.pkmn-icon-small').src}" style="height:50px;"><br>${p.querySelector('input').value}<br>HP: ${hp}`; if(hp > 0) { card.onclick = () => { if(side === 1) activeP1 = p; else activeP2 = p; menu.style.display = 'none'; updateArena(); }; } grid.appendChild(card); }); 
+    }
+
+function openItemMenu(side) {
+        const menu = document.getElementById('itemMenu'), grid = document.getElementById('itemGrid');
+        menu.style.display = 'flex';
+        // HINZUGEFÜGT: Gegengift-Button (Nutzt die Bild-Variable für das übergebene Bild, z.B. imgGegengift)
+        grid.innerHTML = `
+            <button class="btn-action potion" style="min-height:80px;" onclick="applyBattleItem(${side}, 'heal', 120)"><img src="${imgTrank}">Trank (+120)</button>
+            <button class="btn-action super" style="min-height:80px;" onclick="applyBattleItem(${side}, 'heal', 200)"><img src="${imgSuper}">Super-T. (+200)</button>
+            <button class="btn-action hyper" style="min-height:80px;" onclick="applyBattleItem(${side}, 'heal', 9999)"><img src="${imgHyper}">Hyper-T. (MAX)</button>
+            <button class="btn-action revive" style="min-height:80px;" onclick="applyBattleItem(${side}, 'revive', 160)"><img src="${imgBeleber}">Beleber (160)</button>
+            <button class="btn-action max-revive" style="min-height:80px;" onclick="applyBattleItem(${side}, 'revive', 9999)"><img src="${imgTopBeleber}">Top-Bel. (MAX)</button>
+            <button class="btn-action antidote" style="min-height:80px; background-color: #9b59b6; color: white;" onclick="applyBattleItem(${side}, 'antidote', 0)"><img src="${imgGegengift}">Gegengift</button>
+        `;
+    }
+
+    function applyBattleItem(side, type, amount) {
+        const pkmn = (side === 1 ? activeP1 : activeP2);
+        const hpBox = pkmn.querySelector('.hp-box');
+        const maxHp = parseInt(pkmn.dataset.maxhp);
+        let currentHp = parseInt(hpBox.innerText);
+
+        if(type === 'heal') {
+            if(currentHp <= 0) return showToast("PKMN braucht Beleber!");
+            hpBox.innerText = Math.min(maxHp, currentHp + amount);
+            showToast("Geheilt!");
+        } else if(type === 'revive') {
+            if(currentHp > 0) return showToast("PKMN ist nicht besiegt!");
+            hpBox.innerText = Math.min(maxHp, amount);
+            pkmn.dataset.poisoned = "false";
+            pkmn.removeAttribute('data-poison-fresh');
+            showToast("Wiederbelebt!");
+        } else if(type === 'antidote') {
+            // HINZUGEFÜGT: Logik für das Gegengift
+            if(currentHp <= 0) return showToast("Pokémon ist bereits besiegt!");
+            if(pkmn.dataset.poisoned !== "true") return showToast("Pokémon ist nicht vergiftet!");
+            
+            // Vergiftung aufheben und alle dazugehörigen Datensätze löschen
+            pkmn.dataset.poisoned = "false";
+            pkmn.removeAttribute('data-poison-dmg');
+            pkmn.removeAttribute('data-poison-source-id');
+            pkmn.removeAttribute('data-poison-fresh');
+            showToast(pkmn.querySelector('input').value + " wurde vom Gift geheilt!");
+        }
+        
+        document.getElementById('itemMenu').style.display = 'none'; 
+        updateArena();
+    }
+
+    function triggerAtk(dmg, type, e, maxHits = 1, name = "") { 
+        e.stopPropagation(); 
+        currentBaseDmg = dmg; currentAtkType = type; currentAtkName = name; multiHitMax = maxHits;
+        multiHitCount = 0; accumulatedHitsDmg = 0; totalCritBonus = 0;
+        
+        document.getElementById('diceModal').style.display='block'; 
+        document.getElementById('hitSelection').style.display='flex'; 
+        document.getElementById('diceSelection').style.display='none';
+        updateHitCounterUI();
+    }
+
+    function updateHitCounterUI() {
+        const display = document.getElementById('hitCounterDisplay');
+        display.innerText = multiHitCount > 0 ? multiHitCount + "x" : "";
+    }
+function dittoTransform(side) {
+    const attacker = (side === '1' ? activeP1 : activeP2);
+    const target = (side === '1' ? activeP2 : activeP1);
+    
+    // Kopiere alle Attacken des Ziels auf Ditto
+    const targetName = target.querySelector('input').value;
+    const targetData = pokemonDB[targetName];
+    
+    if (targetData) {
+        // Wir speichern die kopierten Attacken direkt in einer Eigenschaft des Cards
+        attacker.dataset.transformedAtks = JSON.stringify(targetData.atks);
+        attacker.dataset.isTransformed = "true";
+        
+        showToast("Ditto hat sich in " + targetName + " verwandelt!");
+        updateArena();
+    }
+}
+    function processHit(type) { 
+        if(type === 'miss') { 
+            if(multiHitCount > 0) showDiceSelection();
+            else { document.getElementById('diceModal').style.display='none'; endTurn(); }
+            return; 
+        } 
+        multiHitCount++;
+        accumulatedHitsDmg += currentBaseDmg;
+        if(type === 'crit') totalCritBonus += 25;
+        updateHitCounterUI();
+        if(multiHitCount >= multiHitMax) showDiceSelection();
+    }
+
+    function showDiceSelection() {
+        document.getElementById('hitSelection').style.display='none'; 
+        document.getElementById('diceSelection').style.display='block';
+    }
+    function showCounterUI(attacker, target) {
+    // Hole den Schaden, den Woingenau zuletzt kassiert hat
+    // Wir nutzen das Dataset des Angreifers, um zu sehen, was er zuletzt abbekommen hat
+    let reflectedDamage = parseInt(attacker.dataset.lastIncomingDamage) || 0;
+
+    // Erstelle ein einfaches Dialog-Overlay
+    const counterOverlay = document.createElement('div');
+    counterOverlay.id = "counterOverlay";
+    counterOverlay.innerHTML = `
+        <div style="background:white; padding:20px; border:2px solid black;">
+            <h3>Konter-Modus!</h3>
+            <p>War der Chip perfekt auf der Skala?</p>
+            <button id="btnHit">Perfekt (Reflektieren: ${reflectedDamage} Schaden)</button>
+            <button id="btnMiss">Nur Abwehr</button>
+        </div>
+    `;
+    document.body.appendChild(counterOverlay);
+
+    // Hit-Logik
+    document.getElementById('btnHit').onclick = () => {
+        target.querySelector('.hp-box').innerText = Math.max(0, parseInt(target.querySelector('.hp-box').innerText) - reflectedDamage);
+        showToast("Konter erfolgreich! " + reflectedDamage + " Schaden reflektiert.");
+        closeCounter();
+    };
+
+    // Miss-Logik
+    document.getElementById('btnMiss').onclick = () => {
+        showToast("Attacke abgewehrt.");
+        closeCounter();
+    };
+}
+
+function closeCounter() {
+    document.getElementById('counterOverlay').remove();
+    document.getElementById('diceModal').style.display = 'none';
+    endTurn();
+}
+ function finishDamage(roll) { 
+    const attacker = attackerSide === 1 ? activeP1 : activeP2; 
+    const target = attackerSide === 1 ? activeP2 : activeP1;
+    const targetName = target.querySelector('input').value;
+    const attackerName = attacker.querySelector('input').value;
+
+    
+    const attackerData = pokemonDB[attackerName];
+    
+    let chosenAtk = (attackerData) ? attackerData.atks.find(a => a.n === currentAtkName) : null;
+
+    // 1. NEU: Counter/Spiegelcape Logik
+    if (chosenAtk && chosenAtk.effect === "counter") {
+        // Hier speichern wir den Schaden, der gerade vom Gegner kam (wichtig für die Reflektion)
+        // Hinweis: Du musst sicherstellen, dass vor diesem Zug 'totalDamage' des Gegners 
+        // global oder im Dataset gespeichert wurde.
+        showCounterUI(attacker, target); 
+        return; 
+    }
+    
+    // 2. Transformation prüfen
+    if (currentAtkName === "Wandler") {
+        document.getElementById('diceModal').style.display = 'none';
+        if (roll !== 1) {
+            const targetData = pokemonDB[targetName];
+            if (targetData) {
+                attacker.dataset.transformedAtks = JSON.stringify(targetData.atks);
+                attacker.dataset.isTransformed = "true";
+                showToast(attackerName + " verwandelt sich in " + targetName + "!");
+            }
+        } else {
+            showToast("Wandler ist fehlgeschlagen!");
+        }
+        endTurn();
+        return;
+    }
+
+    // 3. Datenvorbereitung
+    const targetPkmnData = pokemonDB[targetName];
+    const targetTypes = targetPkmnData ? targetPkmnData.types : ["Normal"];
+
+    if (chosenAtk && chosenAtk.selfKO) {
+        attacker.querySelector('.hp-box').innerText = "0"; 
+        showToast(attackerName + " opfert sich!");
+    }
+    
+    // 4. Typ-Effektivität berechnen
+    let effectivenessValue = 0, isImmune = false;
+    targetTypes.forEach(tType => {
+        if(typeChart[currentAtkType]) {
+            if(typeChart[currentAtkType].immune.includes(tType)) isImmune = true;
+            if(typeChart[currentAtkType].effective.includes(tType)) effectivenessValue += 10;
+            if(typeChart[currentAtkType].weak.includes(tType)) effectivenessValue -= 10;
+        }
+    });
+
+    let modifiedBase = accumulatedHitsDmg;
+    if (!isImmune) {
+        if (effectivenessValue === 10) modifiedBase *= 1.25;      
+        else if (effectivenessValue >= 20) modifiedBase *= 1.50; 
+        else if (effectivenessValue === -10) modifiedBase *= 0.75; 
+        else if (effectivenessValue <= -20) modifiedBase *= 0.50; 
+    } else { modifiedBase = 0; }
+
+    let rollMod = (roll === 1) ? -10 : (roll === 5) ? 10 : (roll === 6) ? 20 : 0; 
+    let totalDamage = isImmune ? 0 : Math.max(0, Math.round(modifiedBase) + rollMod + totalCritBonus);
+
+    // 5. Gift-Logik
+    let isPoisonAttack = false;
+    let poisonValue = 10; 
+    if (chosenAtk && chosenAtk.effect === "poison") {
+    isPoisonAttack = true;
+
+    // z.B. "Giftpuder (-15)" -> 15
+    const poisonMatch = chosenAtk.n.match(/\(-(\d+)\)/);
+
+    if (poisonMatch) {
+        poisonValue = parseInt(poisonMatch[1]);
+    }
+}
+
+if (isPoisonAttack && !isImmune) {
+    const poisonChance = chosenAtk.poisonChance ?? 100;
+    const poisonRoll = Math.random() * 100;
+
+    if (poisonRoll < poisonChance) {
+        target.dataset.poisoned = "true";
+        target.dataset.poisonDmg = poisonValue;
+        target.dataset.poisonSourceId = attacker.id;
+    } else {
+        isPoisonAttack = false;
+    }
+}
+    // 6. Schadensfreie Spezialattacken abfangen
+    if (chosenAtk && chosenAtk.d === 0 && chosenAtk.effect !== "heal") {
+        if (chosenAtk.effect === "confuse") showToast(targetName + " wurde verwirrt!");
+        if (chosenAtk.effect === "sleep") showToast(targetName + " schläft ein!");
+        if (isPoisonAttack) showToast(targetName + " wurde vergiftet!");
+        document.getElementById('diceModal').style.display = 'none';
+        endTurn();
+        return; 
+    }
+    
+    // 7. HP anpassen (Ziel)
+    if (attackerSide === 1) damageThisRoundP1 = totalDamage;
+    else damageThisRoundP2 = totalDamage;
+    const hpBox = target.querySelector('.hp-box'); 
+    let oldHp = parseInt(hpBox.innerText), newHp = Math.max(0, oldHp - totalDamage); 
+    hpBox.innerText = newHp; 
+    document.getElementById('diceModal').style.display = 'none'; 
+
+    if (isImmune) showToast("Hat keine Wirkung!");
+    else if (effectivenessValue > 0) showToast("Es ist sehr effektiv!");
+    else if (effectivenessValue < 0) showToast("Nicht sehr effektiv...");
+
+    // 8. Heilungs-/Drain-Logik
+    // Kein Heilen im letzten Widerstand (Angreifer hat 0 KP), da entscheidet nur der Schaden
+    if (chosenAtk && parseInt(attacker.querySelector('.hp-box').innerText) > 0) {
+        const attackerHpBox = attacker.querySelector('.hp-box');
+        const attackerMaxHp = parseInt(attacker.dataset.maxhp);
+        let attackerCurrentHp = parseInt(attackerHpBox.innerText);
+
+        if (chosenAtk.effect === "heal") {
+            let healAmount = Math.floor(attackerMaxHp / 2);
+            attackerHpBox.innerText = Math.min(attackerMaxHp, attackerCurrentHp + healAmount);
+            showToast(attackerName + " hat sich um " + healAmount + " HP erholt!");
+        } else if (chosenAtk.drain && totalDamage > 0) {
+            // Nur den Schaden zählen, den das Ziel wirklich verloren hat (kein Overkill)
+            let healAmount = Math.floor((oldHp - newHp) / 2);
+            attackerHpBox.innerText = Math.min(attackerMaxHp, attackerCurrentHp + healAmount);
+            showToast(attackerName + " saugt " + healAmount + " HP auf!");
+        }
+    }
+   if (totalDamage > 0) {
+        target.dataset.lastIncomingDamage = totalDamage;
+    }
+    
+    if (isPoisonAttack && totalDamage > 0) showToast(targetName + " wurde vergiftet!");
+
+    endTurn();
+}
+
+    function endTurn() {
+        if(attackerSide === 1) {
+            attackerSide = 2;
+            updateArena();
+            const hp2 = parseInt(activeP2.querySelector('.hp-box').innerText);
+            if(hp2 <= 0) showToast("P2: Letzter Widerstand!");
+        } else {
+            processPoisonDamage();
+            
+            let hp1 = parseInt(activeP1.querySelector('.hp-box').innerText);
+            let hp2 = parseInt(activeP2.querySelector('.hp-box').innerText);
+
+            if (hp1 <= 0 && hp2 <= 0) {
+                if (damageThisRoundP2 > damageThisRoundP1) {
+                    activeP2.querySelector('.hp-box').innerText = "10";
+                    showToast("P2 setzt sich durch!");
+                } else if (damageThisRoundP1 > damageThisRoundP2) {
+                    activeP1.querySelector('.hp-box').innerText = "10";
+                    showToast("P1 setzt sich durch!");
+                }
+            }
+
+            checkEvolutionAfterRound();
+
+            damageThisRoundP1 = 0; damageThisRoundP2 = 0;
+            currentRound++; attackerSide = 1;
+            updateArena();
+            checkGameOver();
+        }
+    }
+function getWinsNeeded(pokemonName, stage) {
+    const current = pokemonDB[pokemonName];
+
+    // Manueller Sonderwert hat Vorrang, z.B. Evoli
+    if (current?.levelWins) {
+        return current.levelWins[stage - 1];
+    }
+
+    // S1 -> S2 und S2 -> S3 immer 2 Siege
+    if (stage < 3) {
+        return 2;
+    }
+
+    // Ab hier S3 -> Entwicklung
+    const next = evolutions[pokemonName];
+
+    // Keine Entwicklung
+    if (!next) {
+        return 2;
+    }
+
+    // Mehrere Entwicklungen möglich
+    const nextNames = Array.isArray(next) ? next : [next];
+
+    const nextCategories = nextNames
+        .map(name => pokemonDB[name]?.kat)
+        .filter(kat => kat != null);
+
+    if (nextCategories.length === 0) {
+        return 2;
+    }
+
+    const currentKat = current?.kat || 1;
+    const highestNextKat = Math.max(...nextCategories);
+    const categoryJump = highestNextKat - currentKat;
+
+    // Kategorie-Regel
+    if (categoryJump <= 1) return 2;
+    if (categoryJump === 2) return 4;
+    if (categoryJump >= 3) return 6;
+
+    return 2;
+}
+  function checkEvolutionAfterRound() {
+    [activeP1, activeP2].forEach((pkmn, idx) => {
+        const opp = (idx === 0) ? activeP2 : activeP1;
+        const myHpBox = pkmn.querySelector('.hp-box');
+        const oppHpBox = opp.querySelector('.hp-box');
+
+        const myHp = parseInt(myHpBox.innerText);
+        const oppHp = parseInt(oppHpBox.innerText);
+
+        if (myHp > 0 && oppHp <= 0) {
+            let w = parseInt(pkmn.dataset.wins) + 1;
+            let s = parseInt(pkmn.dataset.stage);
+            const curName = pkmn.querySelector('input').value;
+
+            const db = pokemonDB[curName];
+
+            
+          const winsNeeded = getWinsNeeded(curName, s);
+
+            if (w >= winsNeeded) {
+
+                // STUFENAUFSTIEG S1 → S2 oder S2 → S3
+                if (s < 3) {
+                    const oldMaxHp = parseInt(pkmn.dataset.maxhp);
+                    const currentHp = parseInt(myHpBox.innerText);
+                    const missingHp = oldMaxHp - currentHp;
+
+                    s++;
+                    w = 0;
+
+                    if (db) {
+                        const newMaxHp = db.hp[s - 1];
+                        const newHp = Math.max(1, newMaxHp - missingHp);
+
+                        pkmn.dataset.maxhp = newMaxHp;
+                        myHpBox.innerText = newHp;
+                    }
+
+                // ENTWICKLUNG NACH S3
+                } else if (s === 3) {
+                    let next = evolutions[curName];
+
+                    if (Array.isArray(next)) {
+                        showEvolutionChoice(next, pkmn);
+                        return;
+
+                    } else if (next && pokemonDB[next]) {
+                        performEvolution(next, pkmn);
+                        return;
+
+                    } else {
+                        // Keine weitere Entwicklung
+                        w = winsNeeded;
+                    }
+                }
+            }
+pkmn.dataset.wins = w;
+pkmn.dataset.stage = s;
+pkmn.querySelector('.stage-tag').innerText = "S" + s;
+
+// Balken passend zur benötigten Siegzahl
+const currentWinsNeeded = getWinsNeeded(curName, s);
+
+pkmn.querySelector('.win-fill').style.width =
+    Math.min(100, (w / currentWinsNeeded) * 100) + "%";
+        }
+    });
+}
+
+// Hilfsfunktion: Führt die eigentliche Entwicklung aus
+function performEvolution(nextName, pkmn) {
+    showToast(pkmn.querySelector('input').value + " entwickelt sich zu " + nextName + "!");
+    const nd = pokemonDB[nextName];
+    pkmn.querySelector('input').value = nextName;
+    pkmn.querySelector('.pkmn-icon-small').src = nd.icon;
+    pkmn.dataset.kat = nd.kat;
+    pkmn.dataset.stage = "1";
+    pkmn.dataset.wins = "0";
+    pkmn.dataset.maxhp = nd.hp[0];
+    pkmn.querySelector('.hp-box').innerText = nd.hp[0];
+    pkmn.querySelector('.stage-tag').innerText = "S1";
+    pkmn.querySelector('.win-fill').style.width = "0%";
+}
+
+// Hilfsfunktion: Zeigt das Auswahl-Overlay
+function showEvolutionChoice(choices, pkmn) {
+    const overlay = document.createElement('div');
+    overlay.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:9999; display:flex; align-items:center; justify-content:center; gap:20px;";
+    
+    choices.forEach(choice => {
+        const btn = document.createElement('button');
+        btn.innerText = choice;
+        btn.style = "padding:20px; font-size:20px; cursor:pointer;";
+        btn.onclick = () => {
+            performEvolution(choice, pkmn);
+            overlay.remove();
+        };
+        overlay.appendChild(btn);
+    });
+    document.body.appendChild(overlay);
+}
+    function processPoisonDamage() {
+        [activeP1, activeP2].forEach((p, idx) => {
+            if (p && p.dataset.poisoned === "true") {
+                // PRÜFUNG: Ist es frisch vergiftet? Wenn ja, diese Runde überspringen und Flagge löschen
+                if (p.dataset.poisonFresh === "true") {
+                    p.removeAttribute('data-poison-fresh');
+                    return;
+                }
+
+                const hpBox = p.querySelector('.hp-box');
+                let hp = parseInt(hpBox.innerText);
+                
+                const sourceId = p.dataset.poisonSourceId;
+                const attacker = (idx === 0) ? activeP2 : activeP1; 
+                const attackerHp = attacker ? parseInt(attacker.querySelector('.hp-box').innerText) : 0;
+
+                if (!attacker || attackerHp <= 0 || attacker.id !== sourceId || hp <= 0) {
+                    p.dataset.poisoned = "false";
+                    p.removeAttribute('data-poison-dmg');
+                    p.removeAttribute('data-poison-source-id');
+                    return;
+                }
+
+                let dmg = parseInt(p.dataset.poisonDmg) || 10;
+                let newHp = Math.max(0, hp - dmg);
+                hpBox.innerText = newHp;
+                
+                showToast(p.querySelector('input').value + " leidet unter Gift (-" + dmg + " HP)!");
+            }
+        });
+    }
+
+    function checkGameOver() { 
+        const p1L = poolP1.every(p => parseInt(p.querySelector('.hp-box').innerText) <= 0); 
+        const p2L = poolP2.every(p => parseInt(p.querySelector('.hp-box').innerText) <= 0); 
+        if(p1L || p2L) { 
+            setTimeout(() => {
+                alert(p1L ? "SPIELER 2 GEWINNT!" : "SPIELER 1 GEWINNT!"); 
+                closeBattle();
+            }, 500);
+        } 
+    }
+
+    function healTeam(pid) { 
+        document.getElementById(pid).querySelectorAll('.pkmn-card').forEach(c => {
+            c.querySelector('.hp-box').innerText = c.dataset.maxhp;
+            c.dataset.poisoned = "false";
+            c.removeAttribute('data-poison-fresh');
+        });
+        if(activeP1 || activeP2) updateArena(); 
+    } 
+function closeBattle() { 
+        document.getElementById('battleOverlay').style.display = 'none'; 
+        
+        // Alle Gift-Status-Flags entfernen
+        document.querySelectorAll('.pkmn-card').forEach(card => {
+            card.dataset.poisoned = "false";
+            card.removeAttribute('data-poison-dmg');
+            card.removeAttribute('data-poison-source-id');
+            card.removeAttribute('data-poison-fresh');
+        });
+    }
+
+  function saveBattleState() {
+        const saveName = prompt("Wie soll der Spielstand heißen?", "Spielstand " + new Date().toLocaleTimeString());
+        if (!saveName) return;
+
+        const playerContainers = document.querySelectorAll('.player-col');
+        
+        const gameState = {
+            players: Array.from(playerContainers).map(container => {
+                return {
+                    // Spielername speichern (das Input-Feld über den Karten)
+                    playerName: container.querySelector('input') ? container.querySelector('input').value : "Spieler",
+                    cards: Array.from(container.querySelectorAll('.pkmn-card')).map(card => ({
+                        name: card.querySelector('input').value,
+                        hp: card.querySelector('.hp-box').innerText,
+                        maxhp: card.dataset.maxhp,
+                        stage: card.dataset.stage,
+                        wins: card.dataset.wins, // Hier werden die Siege gespeichert
+                        kat: card.dataset.kat,
+                        poisoned: card.dataset.poisoned,
+                        icon: card.querySelector('.pkmn-icon-small').src
+                    }))
+                };
+            })
+        };
+
+        const exportCode = btoa(JSON.stringify(gameState));
+        const overlay = document.createElement('div');
+        overlay.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:9999; display:flex; align-items:center; justify-content:center; flex-direction:column; padding:20px;";
+        overlay.innerHTML = `
+            <div style="background:#2d2d2d; padding:20px; border-radius:15px; width:100%; max-width:400px; text-align:center; border:2px solid #27ae60;">
+                <h3 style="color:#27ae60;">Spielstand gespeichert!</h3>
+                <textarea id="saveCode" style="width:100%; height:100px; background:#111; color:#27ae60; border:none; padding:10px;">${exportCode}</textarea>
+                <button onclick="this.parentElement.parentElement.remove()" style="margin-top:15px; width:100%; padding:10px; background:#27ae60; border:none; color:white; border-radius:5px;">Fertig</button>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        document.getElementById('saveCode').select();
+    }
+
+    function loadBattleState() {
+        const importCode = prompt("Füge hier deinen Spielstand-Code ein:");
+        if (!importCode) return;
+
+        try {
+            const gameState = JSON.parse(atob(importCode));
+            const playerContainers = document.querySelectorAll('.player-col');
+            
+            gameState.players.forEach((playerData, index) => {
+                const container = playerContainers[index];
+                if (container) {
+                    // Spielernamen wiederherstellen
+                    if (container.querySelector('input')) container.querySelector('input').value = playerData.playerName;
+                    
+                    const cards = container.querySelectorAll('.pkmn-card');
+                    playerData.cards.forEach((data, i) => {
+                        if (cards[i]) {
+                            cards[i].querySelector('input').value = data.name;
+                            cards[i].querySelector('.hp-box').innerText = data.hp;
+                            cards[i].dataset.maxhp = data.maxhp;
+                            cards[i].dataset.stage = data.stage;
+                            cards[i].dataset.wins = data.wins; // Siege wiederherstellen
+                            cards[i].dataset.kat = data.kat;
+                            cards[i].dataset.poisoned = data.poisoned;
+                            cards[i].querySelector('.pkmn-icon-small').src = data.icon;
+                            cards[i].querySelector('.stage-tag').innerText = "S" + data.stage;
+                            // Sieg-Balken visuell aktualisieren
+                    const loadedDb = pokemonDB[data.name];
+                    const loadedLevelWins =
+                    (loadedDb && loadedDb.levelWins)
+                    ? loadedDb.levelWins
+                    : [2, 2, 2];
+
+                     const loadedWinsNeeded = loadedLevelWins[parseInt(data.stage) - 1];
+
+                     cards[i].querySelector('.win-fill').style.width =
+                     Math.min(100, (parseInt(data.wins) / loadedWinsNeeded) * 100) + "%";
+                        }
+                    });
+                }
+            });
+            showToast("Spielstand geladen!");
+        } catch (e) {
+            alert("Fehler beim Laden: Der Code ist ungültig.");
+        }
+    }
+    window.onload = () => { 
+        for(let i=0; i<4; i++) createPlayer(); 
+    };
+</script> 
+</body> 
+</html>
