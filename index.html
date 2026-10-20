@@ -66,7 +66,7 @@
         .card-top { display: flex; gap: 12px; align-items: stretch; }
         .card-sprite { position: relative; width: 96px; height: 96px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.25); border-radius: 10px; }
         .card-sprite .pkmn-icon-small { height: 96px; width: 96px; object-fit: contain; margin: 0; }
-        .card-sprite .stage-tag { position: absolute; left: 4px; bottom: 4px; }
+        .card-name-row { display: flex; align-items: center; gap: 8px; }
         .card-info { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; gap: 4px; min-width: 0; padding-right: 28px; }
         .card-name { background: none; border: none; color: white; border-bottom: 1px solid #666; width: 100%; outline: none; font-size: 17px; font-weight: bold; }
         .card-bar-row { display: flex; align-items: center; gap: 6px; }
@@ -2545,13 +2545,16 @@ let players = [], poolP1 = [], poolP2 = [], activeP1 = null, activeP2 = null, ba
             const winsEl = card.querySelector('.card-wins-text');
             if (winsEl.textContent !== winsText) winsEl.textContent = winsText;
             card.querySelector('.win-fill').style.width = Math.min(100, wins / needed * 100) + "%";
+            const stageText = "S" + (card.dataset.stage || 1);
+            const stageEl = card.querySelector('.stage-tag');
+            if (stageEl.textContent !== stageText) stageEl.textContent = stageText;
         });
     }
 
     function addPkmn(pid) { 
         const container = document.getElementById(pid).querySelector('.pkmn-list'); const card = document.createElement('div'); 
         card.className = 'pkmn-card'; card.dataset.stage = "1"; card.dataset.wins = "0"; card.dataset.kat = "1"; card.dataset.maxhp = "140"; card.dataset.poisoned = "false";
-        card.innerHTML = `<button class="del-btn" onclick="this.parentElement.remove()">&times;</button><div class="card-top"><div class="card-sprite"><img class="pkmn-icon-small" src="${pkBallSprite}"><span class="stage-tag">S1</span></div><div class="card-info"><div style="position:relative;"><input type="text" placeholder="Name..." oninput="showSearch(this)" class="card-name"><div class="search-results"></div></div><div class="card-bar-row"><span class="card-bar-label">KP</span><div class="card-hp-track"><div class="card-hp-fill"></div></div></div><div class="card-hp-text"><div class="hp-box">140</div><span class="card-hp-max">/ 140</span></div><div class="card-bar-row"><span class="card-bar-label">EP</span><div class="win-track"><div class="win-fill"></div></div><span class="card-wins-text">0/2</span></div></div></div><div class="btn-grid"><button class="btn-action potion" onclick="applyHeal(this, 120)"><img src="${imgTrank}">120</button><button class="btn-action super" onclick="applyHeal(this, 200)"><img src="${imgSuper}">200</button><button class="btn-action hyper" onclick="applyHeal(this, 9999)"><img src="${imgHyper}">MAX</button><button class="btn-action revive" onclick="applyRevive(this, 160)"><img src="${imgBeleber}">160</button><button class="btn-action max-revive" onclick="applyRevive(this, 9999)"><img src="${imgTopBeleber}">MAX</button></div>`; 
+        card.innerHTML = `<button class="del-btn" onclick="this.parentElement.remove()">&times;</button><div class="card-top"><div class="card-sprite"><img class="pkmn-icon-small" src="${pkBallSprite}"></div><div class="card-info"><div class="card-name-row"><span class="stage-tag">S1</span><div style="position:relative; flex-grow:1; min-width:0;"><input type="text" placeholder="Name..." oninput="showSearch(this)" class="card-name"><div class="search-results"></div></div></div><div class="card-bar-row"><span class="card-bar-label">KP</span><div class="card-hp-track"><div class="card-hp-fill"></div></div></div><div class="card-hp-text"><div class="hp-box">140</div><span class="card-hp-max">/ 140</span></div><div class="card-bar-row"><span class="card-bar-label">EP</span><div class="win-track"><div class="win-fill"></div></div><span class="card-wins-text">0/2</span></div></div></div><div class="btn-grid"><button class="btn-action potion" onclick="applyHeal(this, 120)"><img src="${imgTrank}">120</button><button class="btn-action super" onclick="applyHeal(this, 200)"><img src="${imgSuper}">200</button><button class="btn-action hyper" onclick="applyHeal(this, 9999)"><img src="${imgHyper}">MAX</button><button class="btn-action revive" onclick="applyRevive(this, 160)"><img src="${imgBeleber}">160</button><button class="btn-action max-revive" onclick="applyRevive(this, 9999)"><img src="${imgTopBeleber}">MAX</button></div>`; 
         container.appendChild(card); 
     }
 
