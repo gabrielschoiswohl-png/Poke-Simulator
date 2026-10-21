@@ -183,6 +183,10 @@
         .wild-result img { width: 52px; height: 52px; object-fit: contain; image-rendering: pixelated; display: block; margin: 0 auto; }
         .wild-result.selected { border-color: #e74c3c; box-shadow: 0 0 0 1px #e74c3c; background: rgba(231,76,60,0.15); }
         .wild-preview { margin-top: 12px; }
+        .wild-starter-label { margin-top: 14px; }
+        .wild-starter-grid { grid-template-columns: repeat(auto-fill, minmax(95px, 1fr)); }
+        .wild-starter-grid .pick-card img { width: 56px; height: 56px; }
+        .pick-card.fainted { cursor: default; opacity: 0.6; }
         .wild-preview-card { display: flex; gap: 12px; align-items: center; background: rgba(255,255,255,0.04); border: 1px solid #e74c3c; border-radius: 14px; padding: 12px; }
         .wild-preview-card img { width: 90px; height: 90px; object-fit: contain; image-rendering: pixelated; }
         .wild-preview-card .wp-name { font-size: 20px; font-weight: bold; }
@@ -358,6 +362,8 @@
             <div class="setup-side side-p1">
                 <div class="side-label">Trainer</div>
                 <div id="wildPlayerChoices" class="side-choices"></div>
+                <div class="side-label wild-starter-label">Startet mit</div>
+                <div id="wildStarterPick" class="pick-grid wild-starter-grid"></div>
             </div>
             <div class="setup-vs">VS</div>
             <div class="setup-side side-p2">
@@ -2919,7 +2925,7 @@ let players = [], poolP1 = [], poolP2 = [], activeP1 = null, activeP2 = null, ba
     // 🌿 WILDES POKÉMON
     // ==========================================
     let battleType = "trainer";
-    let wildPlayerId = null, wildPick = null, wildStage = 1;
+    let wildPlayerId = null, wildPick = null, wildStage = 1, wildStarter = null;
 
     function openWildSetup() {
         battleType = "wild";
@@ -2942,7 +2948,27 @@ let players = [], poolP1 = [], poolP2 = [], activeP1 = null, activeP2 = null, ba
             const item = document.createElement('div');
             item.className = 'player-choice' + (wildPlayerId === p.id ? ' selected' : '');
             item.innerHTML = `<span class="pc-name">${col.querySelector('input').value}</span><span class="pc-team">${sprites}</span>`;
-            item.onclick = () => { wildPlayerId = p.id; renderWildPlayers(); };
+            item.onclick = () => { wildPlayerId = p.id; wildStarter = null; renderWildPlayers(); };
+            cont.appendChild(item);
+        });
+        renderWildStarter();
+    }
+
+    // Mit welchem Pokémon der Trainer gegen das wilde Pokémon startet
+    function renderWildStarter() {
+        const cont = document.getElementById('wildStarterPick'); cont.innerHTML = "";
+        const col = document.getElementById(wildPlayerId);
+        if (!col) return;
+        const team = Array.from(col.querySelectorAll('.pkmn-card')).filter(c => pokemonDB[c.querySelector('input').value]);
+        const alive = team.filter(c => parseInt(c.querySelector('.hp-box').innerText) > 0);
+        if (!alive.includes(wildStarter)) wildStarter = alive[0] || null;
+        team.forEach(c => {
+            const hp = parseInt(c.querySelector('.hp-box').innerText), max = parseInt(c.dataset.maxhp) || hp || 1;
+            const pct = Math.max(0, Math.min(100, hp / max * 100));
+            const item = document.createElement('div');
+            item.className = 'pick-card' + (hp <= 0 ? ' fainted' : '') + (c === wildStarter ? ' selected' : '');
+            item.innerHTML = `<img src="${c.querySelector('.pkmn-icon-small').src}"><div class="pick-name"><span class="stage-tag">S${c.dataset.stage || 1}</span> ${c.querySelector('input').value}</div><div class="pick-hp"><div style="width:${pct}%;background:${pct > 50 ? '#2ecc71' : pct > 20 ? '#f1c40f' : '#e74c3c'}"></div></div><div class="pick-hp-text">${hp} / ${max} KP</div>`;
+            if (hp > 0) item.onclick = () => { wildStarter = c; renderWildStarter(); };
             cont.appendChild(item);
         });
     }
@@ -2989,7 +3015,8 @@ let players = [], poolP1 = [], poolP2 = [], activeP1 = null, activeP2 = null, ba
         wild.dataset.wild = "true";
 
         battleMode = team.length;
-        poolP1 = alive.concat(team.filter(c => !alive.includes(c)));
+        const starter = alive.includes(wildStarter) ? wildStarter : alive[0];
+        poolP1 = [starter].concat(alive.filter(c => c !== starter), team.filter(c => !alive.includes(c)));
         poolP2 = [wild];
         lastCryP1 = lastCryP2 = null;
         playBattleMusic(true);
@@ -3583,7 +3610,7 @@ function showEvolutionAnimation(oldName, oldIcon, newName, newIcon, pkmn) {
 
     // Phase 1: kurz das alte Pokémon zeigen, dann ca. 16 Sekunden lang zwischen alt und neu wechseln
     // (als weiße Silhouette), erst langsam, dann immer schneller
-    const FLICKER_MS = 16000;
+    const FLICKER_MS = 11000;
     setTimeout(() => {
         img.classList.add('silhouette');
         overlay.classList.add('evolving');
