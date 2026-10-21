@@ -3576,25 +3576,37 @@ function showEvolutionAnimation(oldName, oldIcon, newName, newIcon, pkmn) {
     const btn = overlay.querySelector('.evo-btn');
     playCry({ querySelector: () => ({ src: oldIcon }) });
 
-    // Phase 1: kurz das alte Pokémon zeigen, dann immer schneller zwischen alt und neu wechseln (als weiße Silhouette)
+    // Entwicklungsmusik nur während der Animation
+    const evoMusic = new Audio('sounds/entwicklung.mp3');
+    evoMusic.volume = 0.8;
+    if (soundOn) evoMusic.play().catch(() => {});
+
+    // Phase 1: kurz das alte Pokémon zeigen, dann ca. 16 Sekunden lang zwischen alt und neu wechseln
+    // (als weiße Silhouette), erst langsam, dann immer schneller
+    const FLICKER_MS = 16000;
     setTimeout(() => {
         img.classList.add('silhouette');
         overlay.classList.add('evolving');
-        let delay = 450, showNew = false;
+        const start = Date.now();
+        let showNew = false;
         const flip = () => {
+            const progress = (Date.now() - start) / FLICKER_MS;
+            if (progress >= 1) return reveal();
             showNew = !showNew;
             img.src = showNew ? newIcon : oldIcon;
-            delay = Math.max(60, delay * 0.84);
-            if (delay > 60 || flip.count++ < 14) setTimeout(flip, delay);
-            else reveal();
+            setTimeout(flip, 1100 * Math.pow(1 - progress, 2) + 50);
         };
-        flip.count = 0;
-        setTimeout(flip, delay);
-    }, 1400);
+        setTimeout(flip, 1100);
+    }, 2500);
 
     // Phase 2: weißer Blitz, das neue Pokémon erscheint
     function reveal() {
         overlay.classList.add('flash');
+        // Entwicklungsmusik kurz ausblenden
+        const fade = setInterval(() => {
+            evoMusic.volume = Math.max(0, evoMusic.volume - 0.1);
+            if (evoMusic.volume <= 0) { evoMusic.pause(); clearInterval(fade); }
+        }, 40);
         setTimeout(() => {
             img.src = newIcon;
             img.classList.remove('silhouette');
