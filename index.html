@@ -141,6 +141,7 @@
         .atk-btn { background: #444; border: 1px solid #666; color: white; border-radius: 4px; padding: 5px; font-size: 11px; cursor: pointer; height: 50px; } 
         .atk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 8px; } 
         
+        .sound-toggle { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 50%; width: 42px; height: 42px; font-size: 20px; cursor: pointer; flex-shrink: 0; }
         #saveBadge { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.9); color: white; padding: 12px 24px; border-radius: 25px; border: 2px solid var(--success); font-weight: bold; z-index: 9999; display: none; align-items: center; gap: 10px; pointer-events: none; }
         #saveBadge.show { display: flex; }
         .save-spinner { width: 16px; height: 16px; border: 3px solid #555; border-top-color: var(--success); border-radius: 50%; display: inline-block; animation: saveSpin 0.6s linear infinite; }
@@ -270,6 +271,7 @@
 <div style="display: flex; justify-content: center; gap: 10px; margin: 15px; padding: 10px; background: #2d2d2d; border-radius: 12px; border: 1px solid #444;">
     <button onclick="saveBattleState()" style="background: #27ae60; color: white; padding: 10px 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; flex: 1; max-width: 150px;">💾 Speichern</button>
     <button onclick="loadBattleState()" style="background: #2980b9; color: white; padding: 10px 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; flex: 1; max-width: 150px;">📂 Laden</button>
+    <button class="sound-toggle" onclick="toggleSound()" title="Ton an/aus">🔊</button>
 </div>
 <div id="board" class="grid"></div> 
 <button class="btn-battle-main" onclick="openBattleSetup()">⚔️ KAMPF STARTEN</button> 
@@ -281,7 +283,7 @@
 <div id="battleOverlay"> 
     <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 5px;"> 
         <h2 style="margin:0; color:var(--win);">ARENA</h2> 
-        <button onclick="closeBattle()" style="background:none; border:none; color:white; font-size:32px;">&times;</button> 
+        <div style="display:flex; align-items:center; gap:10px;"><button class="sound-toggle" onclick="toggleSound()" title="Ton an/aus">🔊</button><button onclick="closeBattle()" style="background:none; border:none; color:white; font-size:32px;">&times;</button></div> 
     </div> 
     <div id="turnIndicator">P1 STARTET</div>
     <div id="setupView"> 
@@ -382,6 +384,39 @@ audioTracks.arena.loop = true;
 audioTracks.battle.loop = true;
 let currentTrack = null;
 
+// ==========================================
+// 🔊 SOUNDS (Ton an/aus wird am Gerät gemerkt)
+// ==========================================
+let soundOn = true;
+try { soundOn = localStorage.getItem('pokeSimulatorSound') !== 'off'; } catch (e) {}
+
+function updateSoundButtons() {
+    document.querySelectorAll('.sound-toggle').forEach(b => b.innerText = soundOn ? '🔊' : '🔇');
+}
+
+function toggleSound() {
+    soundOn = !soundOn;
+    try { localStorage.setItem('pokeSimulatorSound', soundOn ? 'on' : 'off'); } catch (e) {}
+    if (!soundOn && currentTrack) currentTrack.pause();
+    if (soundOn && currentTrack) currentTrack.play().catch(() => {});
+    updateSoundButtons();
+}
+
+// Spielt einen Sound aus dem Ordner "sounds" ab (z. B. playSound('cries/25.mp3'))
+function playSound(file, volume = 1) {
+    if (!soundOn) return;
+    const a = new Audio('sounds/' + file);
+    a.volume = volume;
+    a.play().catch(() => {});
+}
+
+// Pokémon-Ruf: die Nummer steckt im Sprite-Link (…/25.png)
+function playCry(card) {
+    if (!card) return;
+    const m = card.querySelector('.pkmn-icon-small').src.match(/\/0*(\d+)\.png$/);
+    if (m) playSound('cries/' + m[1] + '.mp3', 0.6);
+}
+
 function playMusic(trackName) {
     if (currentTrack === audioTracks[trackName]) return;
     if (currentTrack) {
@@ -389,7 +424,7 @@ function playMusic(trackName) {
         currentTrack.currentTime = 0;
     }
     currentTrack = audioTracks[trackName];
-    if (currentTrack) {
+    if (currentTrack && soundOn) {
         currentTrack.play().catch(err => console.log("iPad wartet auf Berührung des Bildschirms..."));
     }
 }
@@ -2792,6 +2827,7 @@ let players = [], poolP1 = [], poolP2 = [], activeP1 = null, activeP2 = null, ba
             return alert(`P1 muss ${p1Required} und P2 muss ${p2Required} PKMN wählen!`); 
         }
 
+        lastCryP1 = lastCryP2 = null;
         activeP1 = poolP1[0]; activeP2 = poolP2[0]; attackerSide = 1; currentRound = 1;
         document.getElementById('turnIndicator').style.display = 'block';
         document.getElementById('pkmnSelectView').style.display='none'; document.getElementById('fightView').style.display='block'; 
@@ -2800,7 +2836,11 @@ let players = [], poolP1 = [], poolP2 = [], activeP1 = null, activeP2 = null, ba
 
     function removePlayer(id) { if(confirm("Löschen?")) { document.getElementById(id).remove(); players = players.filter(p => p.id !== id); } }
 
+    let lastCryP1 = null, lastCryP2 = null;
     function updateArena() { 
+        // Ruf abspielen, wenn ein Pokémon neu in den Kampf kommt
+        if (activeP1 !== lastCryP1) { lastCryP1 = activeP1; playCry(activeP1); }
+        if (activeP2 !== lastCryP2) { lastCryP2 = activeP2; const p2 = activeP2; setTimeout(() => playCry(p2), 900); }
         const pName = attackerSide === 1 ? "SPIELER 1" : "SPIELER 2";
         document.getElementById('turnIndicator').innerText = `RUNDE ${currentRound} - ${pName} AM ZUG`;
         renderSlot(1, activeP1, attackerSide === 1); 
@@ -3561,6 +3601,7 @@ function closeBattle() {
   }
 
     window.onload = () => { 
+        updateSoundButtons();
         // Beim Öffnen: zuerst den automatisch gesicherten Stand, sonst den mit 💾 gespeicherten
         let auto = null;
         try { auto = JSON.parse(localStorage.getItem(AUTO_KEY)); } catch (e) {}
