@@ -420,14 +420,22 @@
     const audioTracks = {
     // Tausche die URLs hier gegen deine eigenen Dropbox- oder Discord-Links aus!
     arena: new Audio('https://actions.google.com/sounds/v1/ambiences/morning_birds.ogg'), 
-    battle: new Audio('sounds/kampf.mp3'),
+    battle: null, // wird bei jedem Trainer-Duell zufällig gewählt, siehe playBattleMusic()
     victory: new Audio('sounds/sieg.mp3'),
     evolution: new Audio('https://actions.google.com/sounds/v1/science_fiction/alien_beacon.ogg') 
 };
 
 // Musik-Schleifen im Hintergrund aktivieren
 audioTracks.arena.loop = true;
-audioTracks.battle.loop = true;
+
+// Kampfmusik fürs Trainer-Duell: bei jedem Kampf zufällig eines dieser Lieder (Ordner sounds/kampf)
+const battleSongs = ['arenaleiter.mp3', 'trainer-johto.mp3', 'champ.mp3', 'top-vier.mp3', 'troy.mp3'];
+function playBattleMusic() {
+    const song = battleSongs[Math.floor(Math.random() * battleSongs.length)];
+    audioTracks.battle = new Audio('sounds/kampf/' + song);
+    audioTracks.battle.loop = true;
+    playMusic('battle');
+}
 let currentTrack = null;
 
 // ==========================================
@@ -2876,7 +2884,7 @@ let players = [], poolP1 = [], poolP2 = [], activeP1 = null, activeP2 = null, ba
         }
 
         lastCryP1 = lastCryP2 = null;
-        playMusic('battle');
+        playBattleMusic();
         activeP1 = poolP1[0]; activeP2 = poolP2[0]; attackerSide = 1; currentRound = 1;
         document.getElementById('turnIndicator').style.display = 'block';
         document.getElementById('pkmnSelectView').style.display='none'; document.getElementById('fightView').style.display='block'; 
@@ -2963,7 +2971,7 @@ let players = [], poolP1 = [], poolP2 = [], activeP1 = null, activeP2 = null, ba
         poolP1 = alive.concat(team.filter(c => !alive.includes(c)));
         poolP2 = [wild];
         lastCryP1 = lastCryP2 = null;
-        playMusic('battle');
+        playMusic('none'); // beim wilden Pokémon (noch) keine Kampfmusik
         activeP1 = poolP1[0]; activeP2 = wild; attackerSide = 1; currentRound = 1;
         document.getElementById('turnIndicator').style.display = 'block';
         document.getElementById('wildSetupView').style.display = 'none';
