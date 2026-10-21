@@ -189,6 +189,35 @@
         .fs-actions .btn-item-arena { border-color: rgba(39,174,96,0.6); }
         .arena-vs { font-size: 34px; font-weight: 900; font-style: italic; background: linear-gradient(135deg, #3498db, #e74c3c); -webkit-background-clip: text; background-clip: text; color: transparent; }
         .pkball-icon { width: 26px; height: 26px; }
+        /* Pokémon-Wahl */
+        .pick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+        .pick-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 10px; cursor: pointer; text-align: center; transition: all 0.2s; }
+        .pick-card img { width: 72px; height: 72px; object-fit: contain; image-rendering: pixelated; }
+        .pick-name { font-weight: bold; font-size: 14px; margin: 2px 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .pick-name .stage-tag { font-size: 10px; }
+        .pick-hp { height: 6px; background: #111; border-radius: 3px; overflow: hidden; }
+        .pick-hp div { height: 100%; }
+        .pick-hp-text { font-size: 11px; color: #aaa; margin-top: 3px; }
+        .pick-card.selected { border-color: var(--side); background: linear-gradient(180deg, color-mix(in srgb, var(--side) 25%, transparent), rgba(255,255,255,0.03)); box-shadow: 0 0 0 1px var(--side), 0 8px 24px color-mix(in srgb, var(--side) 30%, transparent); transform: translateY(-2px); }
+        .pick-card.fainted img { filter: grayscale(1) brightness(0.6); }
+        .pick-count { color: #aaa; margin-left: 6px; letter-spacing: 1px; }
+        /* Würfel-Fenster */
+        #diceModal { background: rgba(22,22,28,0.96); border: 1px solid color-mix(in srgb, var(--type, #f1c40f) 70%, transparent); border-radius: 20px; padding: 22px; max-width: 360px; box-shadow: 0 0 0 100vmax rgba(0,0,0,0.55), 0 20px 50px rgba(0,0,0,0.6), 0 0 30px color-mix(in srgb, var(--type, #f1c40f) 30%, transparent); }
+        .dice-sub { font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: #888; }
+        #diceTitle { margin: 4px 0 16px; font-size: 22px; color: var(--type, white); }
+        .hit-choice { display: flex; gap: 8px; }
+        #diceModal .dice-btn { flex: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 12px; padding: 16px 5px; font-size: 16px; letter-spacing: 1px; color: white; transition: transform 0.1s; }
+        #diceModal .dice-btn:active { transform: scale(0.95); }
+        #diceModal .hit-miss { border-color: rgba(231,76,60,0.7); color: #ff7b6e; }
+        #diceModal .hit-hit { border-color: rgba(46,204,113,0.7); color: #5ee08f; background: rgba(46,204,113,0.1); }
+        #diceModal .hit-crit { border-color: rgba(241,196,15,0.8); color: #f1c40f; background: rgba(241,196,15,0.1); }
+        #diceModal .dice-grid { gap: 8px; margin-top: 8px; }
+        #diceModal .dice-grid .dice-btn { font-size: 22px; padding: 10px 5px; display: flex; flex-direction: column; align-items: center; }
+        #diceModal .dice-grid small { font-size: 11px; color: #aaa; }
+        #diceModal .dice-bad { border-color: rgba(231,76,60,0.6); }
+        #diceModal .dice-bad small { color: #ff7b6e; }
+        #diceModal .dice-good { border-color: rgba(46,204,113,0.6); }
+        #diceModal .dice-good small { color: #5ee08f; }
         #turnIndicator { text-align: center; color: var(--win); font-weight: bold; margin-bottom: 5px; font-size: 18px; text-transform: uppercase; letter-spacing: 1px; }
       /* --- AB HIER NEUE EVOLUTIONS-ANIMATION --- */
         @keyframes evoBlink {
@@ -276,9 +305,19 @@
         <button class="setup-next" onclick="goToPkmnSelection()">Weiter zur Pokémon-Wahl &rarr;</button>
     </div> 
     <div id="pkmnSelectView" style="display:none;"> 
-        <div id="p1PkmnSelect" class="grid" style="gap:8px; margin-bottom:20px;"></div> 
-        <div id="p2PkmnSelect" class="grid" style="gap:8px;"></div> 
-        <button onclick="startFight()" style="width:100%; background:var(--success); padding:16px; color:white; border:none; border-radius:8px; font-weight:bold; margin-top:25px;">LOS!</button> 
+        <div class="setup-title">Pokémon wählen</div>
+        <div class="setup-sides">
+            <div class="setup-side side-p1">
+                <div class="side-label"><span id="p1SelName">Herausforderer</span> <span class="pick-count" id="p1PickCount"></span></div>
+                <div id="p1PkmnSelect" class="pick-grid"></div>
+            </div>
+            <div class="setup-vs">VS</div>
+            <div class="setup-side side-p2">
+                <div class="side-label"><span id="p2SelName">Gegner</span> <span class="pick-count" id="p2PickCount"></span></div>
+                <div id="p2PkmnSelect" class="pick-grid"></div>
+            </div>
+        </div>
+        <button class="setup-next" onclick="startFight()">Los geht's! &#9876;&#65039;</button>
     </div> 
     <div id="fightView" style="display:none;"> 
         <div class="battle-arena"> 
@@ -305,20 +344,22 @@
 
 <div id="diceModal"> 
     <div id="hitCounterDisplay"></div>
-    <h3 id="diceTitle">Schadenswurf</h3> 
-    <div id="hitSelection" style="display:flex; gap:8px; margin-top:15px;"> 
-        <button class="dice-btn" style="background:var(--danger); flex:1;" onclick="processHit('miss')">MISS</button> 
-        <button class="dice-btn" style="background:var(--success); flex:1;" onclick="processHit('hit')">HIT</button> 
-        <button class="dice-btn" style="background:var(--win); color:black; flex:1;" onclick="processHit('crit')">CRIT</button> 
+    <div class="dice-sub">Schadenswurf</div>
+    <h3 id="diceTitle">Angriff</h3> 
+    <div id="hitSelection" class="hit-choice"> 
+        <button class="dice-btn hit-miss" onclick="processHit('miss')">MISS</button> 
+        <button class="dice-btn hit-hit" onclick="processHit('hit')">HIT</button> 
+        <button class="dice-btn hit-crit" onclick="processHit('crit')">CRIT</button> 
     </div> 
     <div id="diceSelection" style="display:none;"> 
+        <div class="dice-sub" style="margin-top:12px;">Würfel</div>
         <div class="dice-grid"> 
-            <button class="dice-btn" onclick="finishDamage(1)">1 (-10)</button> 
-            <button class="dice-btn" onclick="finishDamage(2)">2</button> 
-            <button class="dice-btn" onclick="finishDamage(3)">3</button> 
-            <button class="dice-btn" onclick="finishDamage(4)">4</button> 
-            <button class="dice-btn" onclick="finishDamage(5)">5 (+10)</button> 
-            <button class="dice-btn" onclick="finishDamage(6)">6 (+20)</button> 
+            <button class="dice-btn dice-bad" onclick="finishDamage(1)">1<small>-10</small></button> 
+            <button class="dice-btn" onclick="finishDamage(2)">2<small>&nbsp;</small></button> 
+            <button class="dice-btn" onclick="finishDamage(3)">3<small>&nbsp;</small></button> 
+            <button class="dice-btn" onclick="finishDamage(4)">4<small>&nbsp;</small></button> 
+            <button class="dice-btn dice-good" onclick="finishDamage(5)">5<small>+10</small></button> 
+            <button class="dice-btn dice-good" onclick="finishDamage(6)">6<small>+20</small></button> 
         </div> 
     </div> 
 </div> 
@@ -2719,15 +2760,26 @@ let players = [], poolP1 = [], poolP2 = [], activeP1 = null, activeP2 = null, ba
 
     function fillSelection(containerId, playerId, pool) { 
         const cont = document.getElementById(containerId); cont.innerHTML = ""; 
-        document.getElementById(playerId).querySelectorAll('.pkmn-card').forEach(card => { 
-            const item = document.createElement('div'); item.className = 'pkmn-card'; item.style.width="100px"; item.style.textAlign="center"; 
-            item.innerHTML = `<img src="${card.querySelector('.pkmn-icon-small').src}" style="height:45px;"><br><small>${card.querySelector('input').value || '?'}</small>`; 
+        const side = containerId.startsWith('p1') ? 1 : 2;
+        const col = document.getElementById(playerId);
+        document.getElementById(`p${side}SelName`).innerText = col.querySelector('input').value;
+        const cards = Array.from(col.querySelectorAll('.pkmn-card'));
+        const updateCount = () => { document.getElementById(`p${side}PickCount`).innerText = pool.length + " / " + Math.min(battleMode, cards.length); };
+        cards.forEach(card => { 
+            const hp = parseInt(card.querySelector('.hp-box').innerText) || 0;
+            const maxHp = parseInt(card.dataset.maxhp) || 1;
+            const percent = Math.max(0, Math.min(100, hp / maxHp * 100));
+            const hpColor = percent < 20 ? "var(--danger)" : percent < 50 ? "#f1c40f" : "#2ecc71";
+            const item = document.createElement('div'); item.className = 'pick-card' + (hp <= 0 ? ' fainted' : ''); 
+            item.innerHTML = `<img src="${card.querySelector('.pkmn-icon-small').src}"><div class="pick-name"><span class="stage-tag">S${card.dataset.stage}</span> ${card.querySelector('input').value || '?'}</div><div class="pick-hp"><div style="width:${percent}%; background:${hpColor};"></div></div><div class="pick-hp-text">${hp} / ${maxHp}</div>`; 
             item.onclick = () => { 
-                if(pool.includes(card)) { pool.splice(pool.indexOf(card), 1); item.style.border="1px solid #555"; } 
-                else if(pool.length < battleMode) { pool.push(card); item.style.border= "2px solid var(--win)"; } 
+                if(pool.includes(card)) { pool.splice(pool.indexOf(card), 1); item.classList.remove('selected'); } 
+                else if(pool.length < battleMode) { pool.push(card); item.classList.add('selected'); } 
+                updateCount();
             }; 
             cont.appendChild(item); 
         }); 
+        updateCount();
     } 
 
     function startFight() { 
@@ -2882,6 +2934,8 @@ function openItemMenu(side) {
     function triggerAtk(dmg, type, e, maxHits = 1, name = "") { 
         e.stopPropagation(); 
         currentBaseDmg = dmg; currentAtkType = type; currentAtkName = name; multiHitMax = maxHits;
+        document.getElementById('diceTitle').innerText = name || 'Angriff';
+        document.getElementById('diceModal').style.setProperty('--type', typeColors[type] || '#888');
         multiHitCount = 0; accumulatedHitsDmg = 0; totalCritBonus = 0;
         
         document.getElementById('diceModal').style.display='block'; 
