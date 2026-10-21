@@ -147,6 +147,24 @@
         @keyframes victoryPop { 0% { transform: scale(0.6); opacity: 0; } 70% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(1); } }
         .victory-cup { font-size: 64px; }
         .victory-name { font-size: 34px; font-weight: 900; color: var(--side); margin: 6px 0 10px; }
+        /* Entwicklung */
+        #evoOverlay { position: fixed; inset: 0; z-index: 9500; background: radial-gradient(circle at 50% 40%, #2b2b3a, #07070a 70%); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; padding: 20px; transition: background 0.4s; }
+        #evoOverlay.evolving { background: radial-gradient(circle at 50% 40%, #3a3a6a, #07070a 70%); }
+        #evoOverlay.flash::after { content: ""; position: fixed; inset: 0; background: white; animation: evoFlash 0.8s ease-out forwards; pointer-events: none; }
+        @keyframes evoFlash { 0% { opacity: 0; } 30% { opacity: 1; } 100% { opacity: 0; } }
+        .evo-stage { position: relative; width: 220px; height: 220px; display: flex; align-items: center; justify-content: center; }
+        .evo-glow { position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,0.25), transparent 65%); }
+        #evoOverlay.evolving .evo-glow { animation: evoPulse 0.6s ease-in-out infinite alternate; }
+        @keyframes evoPulse { from { transform: scale(0.85); opacity: 0.5; } to { transform: scale(1.15); opacity: 1; } }
+        .evo-sprite { width: 200px; height: 200px; object-fit: contain; image-rendering: pixelated; position: relative; }
+        .evo-sprite.silhouette { filter: brightness(0) invert(1) drop-shadow(0 0 12px rgba(255,255,255,0.8)); }
+        .evo-sprite.evo-pop { animation: victoryPop 0.6s ease-out; }
+        .evo-text { font-size: 22px; text-align: center; max-width: 520px; line-height: 1.4; }
+        .evo-text b { color: var(--win); }
+        .evo-btn { max-width: 320px; }
+        .evo-choices { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; max-width: 700px; }
+        .evo-choice { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 14px; padding: 10px 14px; color: white; font-weight: bold; font-size: 15px; cursor: pointer; display: flex; flex-direction: column; align-items: center; }
+        .evo-choice img { width: 80px; height: 80px; object-fit: contain; image-rendering: pixelated; }
         #saveBadge { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.9); color: white; padding: 12px 24px; border-radius: 25px; border: 2px solid var(--success); font-weight: bold; z-index: 9999; display: none; align-items: center; gap: 10px; pointer-events: none; }
         #saveBadge.show { display: flex; }
         .save-spinner { width: 16px; height: 16px; border: 3px solid #555; border-top-color: var(--success); border-radius: 50%; display: inline-block; animation: saveSpin 0.6s linear infinite; }
@@ -3465,6 +3483,7 @@ function getWinsNeeded(pokemonName, stage) {
 
                     s++;
                     playSound('level-up.mp3');
+                    lastLevelUpAt = Date.now();
                     w = 0;
 
                     if (db) {
@@ -3507,9 +3526,27 @@ pkmn.querySelector('.win-fill').style.width =
 }
 
 // Hilfsfunktion: Führt die eigentliche Entwicklung aus
+// ==========================================
+// ✨ ENTWICKLUNG (Animation wie im Gameboy-Spiel)
+// ==========================================
+let evoBusy = false;          // läuft gerade eine Entwicklung (oder Auswahl)?
+let afterEvolution = [];      // was danach passieren soll (z. B. Sieger-Anzeige)
+let lastLevelUpAt = 0;        // wann zuletzt der Level-up-Sound kam
+
+function whenEvolutionDone(fn) {
+    if (evoBusy) afterEvolution.push(fn); else fn();
+}
+
+function finishEvolution() {
+    evoBusy = false;
+    const todo = afterEvolution; afterEvolution = [];
+    todo.forEach(fn => fn());
+}
+
+// Hilfsfunktion: Führt die eigentliche Entwicklung aus und zeigt die Animation
 function performEvolution(nextName, pkmn) {
-    playSound('level-up.mp3');
-    showToast(pkmn.querySelector('input').value + " entwickelt sich zu " + nextName + "!");
+    const oldName = pkmn.querySelector('input').value;
+    const oldIcon = pkmn.querySelector('.pkmn-icon-small').src;
     const nd = pokemonDB[nextName];
     pkmn.querySelector('input').value = nextName;
     pkmn.querySelector('.pkmn-icon-small').src = nd.icon;
@@ -3520,22 +3557,81 @@ function performEvolution(nextName, pkmn) {
     pkmn.querySelector('.hp-box').innerText = nd.hp[0];
     pkmn.querySelector('.stage-tag').innerText = "S1";
     pkmn.querySelector('.win-fill').style.width = "0%";
+    showEvolutionAnimation(oldName, oldIcon, nextName, nd.icon, pkmn);
 }
 
-// Hilfsfunktion: Zeigt das Auswahl-Overlay
-function showEvolutionChoice(choices, pkmn) {
+function showEvolutionAnimation(oldName, oldIcon, newName, newIcon, pkmn) {
+    evoBusy = true;
+    const music = currentTrack;
+    if (music) music.pause();
+
     const overlay = document.createElement('div');
-    overlay.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:9999; display:flex; align-items:center; justify-content:center; gap:20px;";
-    
+    overlay.id = 'evoOverlay';
+    overlay.innerHTML = `<div class="evo-stage"><div class="evo-glow"></div><img class="evo-sprite" src="${oldIcon}"></div>
+        <div class="evo-text">Nanu? <b>${oldName}</b> entwickelt sich!</div>
+        <button class="setup-next evo-btn" style="visibility:hidden;">Weiter</button>`;
+    document.body.appendChild(overlay);
+    const img = overlay.querySelector('.evo-sprite');
+    const text = overlay.querySelector('.evo-text');
+    const btn = overlay.querySelector('.evo-btn');
+    playCry({ querySelector: () => ({ src: oldIcon }) });
+
+    // Phase 1: kurz das alte Pokémon zeigen, dann immer schneller zwischen alt und neu wechseln (als weiße Silhouette)
+    setTimeout(() => {
+        img.classList.add('silhouette');
+        overlay.classList.add('evolving');
+        let delay = 450, showNew = false;
+        const flip = () => {
+            showNew = !showNew;
+            img.src = showNew ? newIcon : oldIcon;
+            delay = Math.max(60, delay * 0.84);
+            if (delay > 60 || flip.count++ < 14) setTimeout(flip, delay);
+            else reveal();
+        };
+        flip.count = 0;
+        setTimeout(flip, delay);
+    }, 1400);
+
+    // Phase 2: weißer Blitz, das neue Pokémon erscheint
+    function reveal() {
+        overlay.classList.add('flash');
+        setTimeout(() => {
+            img.src = newIcon;
+            img.classList.remove('silhouette');
+            img.classList.add('evo-pop');
+            overlay.classList.remove('evolving');
+            text.innerHTML = `Glückwunsch! <b>${oldName}</b> hat sich zu <b>${newName}</b> entwickelt!`;
+            playSound('level-up.mp3');
+            lastLevelUpAt = Date.now();
+            setTimeout(() => playCry(pkmn), 300);
+            btn.style.visibility = 'visible';
+        }, 350);
+    }
+
+    btn.onclick = () => {
+        overlay.remove();
+        if (music && music === currentTrack && soundOn) music.play().catch(() => {});
+        if (activeP1 || activeP2) updateArena();
+        finishEvolution();
+    };
+}
+
+// Hilfsfunktion: Zeigt das Auswahl-Overlay (z. B. bei Evoli)
+function showEvolutionChoice(choices, pkmn) {
+    evoBusy = true;
+    const overlay = document.createElement('div');
+    overlay.id = 'evoOverlay';
+    overlay.innerHTML = `<div class="evo-text"><b>${pkmn.querySelector('input').value}</b> kann sich entwickeln. Wähle:</div><div class="evo-choices"></div>`;
+    const cont = overlay.querySelector('.evo-choices');
     choices.forEach(choice => {
         const btn = document.createElement('button');
-        btn.innerText = choice;
-        btn.style = "padding:20px; font-size:20px; cursor:pointer;";
+        btn.className = 'evo-choice';
+        btn.innerHTML = `<img src="${pokemonDB[choice]?.icon || ''}"><span>${choice}</span>`;
         btn.onclick = () => {
-            performEvolution(choice, pkmn);
             overlay.remove();
+            performEvolution(choice, pkmn);
         };
-        overlay.appendChild(btn);
+        cont.appendChild(btn);
     });
     document.body.appendChild(overlay);
 }
@@ -3572,6 +3668,8 @@ function showEvolutionChoice(choices, pkmn) {
     }
 
     function checkGameOver() { 
+        // Erst die Entwicklung fertig anschauen, dann den Sieger zeigen
+        if (evoBusy) { afterEvolution.push(checkGameOver); return; }
         const p1L = poolP1.every(p => parseInt(p.querySelector('.hp-box').innerText) <= 0); 
         const p2L = poolP2.every(p => parseInt(p.querySelector('.hp-box').innerText) <= 0); 
         if(p1L || p2L) { 
@@ -3585,7 +3683,7 @@ function showEvolutionChoice(choices, pkmn) {
                 }
                 playMusic('victory');
                 showVictory(winnerName, p1L ? 2 : 1);
-            }, 500);
+            }, Math.max(500, lastLevelUpAt + 2800 - Date.now())); // Level-up-Sound ausklingen lassen
         } 
     }
 
