@@ -142,6 +142,11 @@
         .atk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 8px; } 
         
         .sound-toggle { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 50%; width: 42px; height: 42px; font-size: 20px; cursor: pointer; flex-shrink: 0; }
+        #victoryOverlay { position: fixed; inset: 0; z-index: 9000; background: rgba(0,0,0,0.75); display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .victory-box { background: rgba(22,22,28,0.97); border: 1px solid var(--side); border-radius: 22px; padding: 30px; text-align: center; width: 100%; max-width: 420px; box-shadow: 0 0 60px color-mix(in srgb, var(--side) 40%, transparent); animation: victoryPop 0.5s ease-out; }
+        @keyframes victoryPop { 0% { transform: scale(0.6); opacity: 0; } 70% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(1); } }
+        .victory-cup { font-size: 64px; }
+        .victory-name { font-size: 34px; font-weight: 900; color: var(--side); margin: 6px 0 10px; }
         #saveBadge { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.9); color: white; padding: 12px 24px; border-radius: 25px; border: 2px solid var(--success); font-weight: bold; z-index: 9999; display: none; align-items: center; gap: 10px; pointer-events: none; }
         #saveBadge.show { display: flex; }
         .save-spinner { width: 16px; height: 16px; border: 3px solid #555; border-top-color: var(--success); border-radius: 50%; display: inline-block; animation: saveSpin 0.6s linear infinite; }
@@ -375,7 +380,8 @@
     const audioTracks = {
     // Tausche die URLs hier gegen deine eigenen Dropbox- oder Discord-Links aus!
     arena: new Audio('https://actions.google.com/sounds/v1/ambiences/morning_birds.ogg'), 
-    battle: new Audio('https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'),  
+    battle: new Audio('sounds/kampf.mp3'),
+    victory: new Audio('sounds/sieg.mp3'),
     evolution: new Audio('https://actions.google.com/sounds/v1/science_fiction/alien_beacon.ogg') 
 };
 
@@ -2828,6 +2834,7 @@ let players = [], poolP1 = [], poolP2 = [], activeP1 = null, activeP2 = null, ba
         }
 
         lastCryP1 = lastCryP2 = null;
+        playMusic('battle');
         activeP1 = poolP1[0]; activeP2 = poolP2[0]; attackerSide = 1; currentRound = 1;
         document.getElementById('turnIndicator').style.display = 'block';
         document.getElementById('pkmnSelectView').style.display='none'; document.getElementById('fightView').style.display='block'; 
@@ -3317,6 +3324,7 @@ function getWinsNeeded(pokemonName, stage) {
                     const missingHp = oldMaxHp - currentHp;
 
                     s++;
+                    playSound('level-up.mp3');
                     w = 0;
 
                     if (db) {
@@ -3360,6 +3368,7 @@ pkmn.querySelector('.win-fill').style.width =
 
 // Hilfsfunktion: Führt die eigentliche Entwicklung aus
 function performEvolution(nextName, pkmn) {
+    playSound('level-up.mp3');
     showToast(pkmn.querySelector('input').value + " entwickelt sich zu " + nextName + "!");
     const nd = pokemonDB[nextName];
     pkmn.querySelector('input').value = nextName;
@@ -3427,13 +3436,25 @@ function showEvolutionChoice(choices, pkmn) {
         const p2L = poolP2.every(p => parseInt(p.querySelector('.hp-box').innerText) <= 0); 
         if(p1L || p2L) { 
             setTimeout(() => {
-                alert(p1L ? "SPIELER 2 GEWINNT!" : "SPIELER 1 GEWINNT!"); 
-                closeBattle();
+                const winnerSel = document.getElementById(p1L ? 'p2Sel' : 'p1Sel');
+                const winnerName = winnerSel.options[winnerSel.selectedIndex]?.text || (p1L ? "Spieler 2" : "Spieler 1");
+                playMusic('victory');
+                showVictory(winnerName, p1L ? 2 : 1);
             }, 500);
         } 
     }
 
+    // Sieger-Anzeige mit Siegesmusik
+    function showVictory(name, side) {
+        const color = side === 1 ? '#3498db' : '#e74c3c';
+        const overlay = document.createElement('div');
+        overlay.id = 'victoryOverlay';
+        overlay.innerHTML = `<div class="victory-box" style="--side:${color}"><div class="victory-cup">🏆</div><div class="dice-sub">Sieger</div><div class="victory-name">${name}</div><button class="setup-next" onclick="document.getElementById('victoryOverlay').remove(); closeBattle();">Zurück zur Übersicht</button></div>`;
+        document.body.appendChild(overlay);
+    }
+
     function healTeam(pid) { 
+        playSound('heilen.mp3');
         document.getElementById(pid).querySelectorAll('.pkmn-card').forEach(c => {
             c.querySelector('.hp-box').innerText = c.dataset.maxhp;
             c.dataset.poisoned = "false";
@@ -3443,6 +3464,7 @@ function showEvolutionChoice(choices, pkmn) {
     } 
 function closeBattle() { 
         document.getElementById('battleOverlay').style.display = 'none'; 
+        playMusic('arena');
         
         // Alle Gift-Status-Flags entfernen
         document.querySelectorAll('.pkmn-card').forEach(card => {
