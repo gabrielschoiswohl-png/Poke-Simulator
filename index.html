@@ -430,9 +430,12 @@ audioTracks.arena.loop = true;
 
 // Kampfmusik fürs Trainer-Duell: bei jedem Kampf zufällig eines dieser Lieder (Ordner sounds/kampf)
 const battleSongs = ['arenaleiter.mp3', 'trainer-johto.mp3', 'champ.mp3', 'top-vier.mp3', 'troy.mp3'];
-function playBattleMusic() {
-    const song = battleSongs[Math.floor(Math.random() * battleSongs.length)];
-    audioTracks.battle = new Audio('sounds/kampf/' + song);
+// Musik für Kämpfe gegen wilde Pokémon (Ordner sounds/wild)
+const wildSongs = ['gold-silber.mp3', 'heartgold.mp3', 'smaragd.mp3', 'feuerrot.mp3', 'rot-blau.mp3'];
+function playBattleMusic(wild = false) {
+    const list = wild ? wildSongs : battleSongs;
+    const song = list[Math.floor(Math.random() * list.length)];
+    audioTracks.battle = new Audio('sounds/' + (wild ? 'wild/' : 'kampf/') + song);
     audioTracks.battle.loop = true;
     playMusic('battle');
 }
@@ -2971,7 +2974,7 @@ let players = [], poolP1 = [], poolP2 = [], activeP1 = null, activeP2 = null, ba
         poolP1 = alive.concat(team.filter(c => !alive.includes(c)));
         poolP2 = [wild];
         lastCryP1 = lastCryP2 = null;
-        playMusic('none'); // beim wilden Pokémon (noch) keine Kampfmusik
+        playBattleMusic(true);
         activeP1 = poolP1[0]; activeP2 = wild; attackerSide = 1; currentRound = 1;
         document.getElementById('turnIndicator').style.display = 'block';
         document.getElementById('wildSetupView').style.display = 'none';
