@@ -153,6 +153,25 @@
         @keyframes saveSpin { to { transform: rotate(360deg); } }
         #battleToast { position: fixed; top: 20%; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.85); color: white; padding: 12px 25px; border-radius: 25px; border: 2px solid var(--win); font-weight: bold; z-index: 6000; display: none; text-align: center; pointer-events: none; }
 
+        .battle-start-bar { position: fixed; bottom: 85px; left: 50%; transform: translateX(-50%); width: 90%; display: flex; gap: 10px; z-index: 1000; }
+        .battle-start-bar button { flex: 1; padding: 18px; border-radius: 35px; color: white; font-weight: bold; font-size: 16px; letter-spacing: 0.5px; cursor: pointer; border: 1px solid rgba(255,255,255,0.4); box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+        .btn-start-trainer { background: linear-gradient(90deg, #2a75bb, #c0392b); }
+        .btn-start-wild { background: linear-gradient(90deg, #1e8449, #27ae60); }
+        .wild-layout { display: grid; grid-template-columns: 1fr auto 1fr; gap: 18px; align-items: start; max-width: 1000px; margin: 0 auto; }
+        @media (max-width: 600px) { .wild-layout { grid-template-columns: 1fr; } }
+        .wild-search { width: 100%; box-sizing: border-box; background: rgba(255,255,255,0.06); border: 1px solid rgba(231,76,60,0.6); border-radius: 12px; padding: 12px 14px; color: white; font-size: 16px; outline: none; }
+        .wild-results { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 6px; margin-top: 8px; max-height: 230px; overflow-y: auto; }
+        .wild-result { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 6px; text-align: center; cursor: pointer; font-size: 12px; font-weight: bold; }
+        .wild-result img { width: 52px; height: 52px; object-fit: contain; image-rendering: pixelated; display: block; margin: 0 auto; }
+        .wild-result.selected { border-color: #e74c3c; box-shadow: 0 0 0 1px #e74c3c; background: rgba(231,76,60,0.15); }
+        .wild-preview { margin-top: 12px; }
+        .wild-preview-card { display: flex; gap: 12px; align-items: center; background: rgba(255,255,255,0.04); border: 1px solid #e74c3c; border-radius: 14px; padding: 12px; }
+        .wild-preview-card img { width: 90px; height: 90px; object-fit: contain; image-rendering: pixelated; }
+        .wild-preview-card .wp-name { font-size: 20px; font-weight: bold; }
+        .wild-preview-card .wp-hp { color: #aaa; font-size: 14px; margin: 2px 0 8px; }
+        .stage-pills { display: flex; gap: 6px; }
+        .stage-pills button { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #ccc; border-radius: 20px; padding: 6px 14px; font-weight: bold; cursor: pointer; }
+        .stage-pills button.active { background: #e67e22; border-color: #e67e22; color: white; }
         .btn-battle-main { position: fixed; bottom: 85px; left: 50%; transform: translateX(-50%); width: 90%; background: var(--danger); color: white; padding: 18px; border-radius: 35px; border: 2px solid white; font-weight: bold; z-index: 1000; font-size: 16px; } 
         .footer { position: fixed; bottom: 0; left: 0; width: 100%; background: #000; padding: 12px; display: flex; gap: 10px; box-sizing: border-box; } 
         .stage-tag { background:#e67e22; padding:2px 6px; border-radius:4px; font-size:12px; font-weight:bold; } 
@@ -279,7 +298,11 @@
     <button class="sound-toggle" onclick="toggleSound()" title="Ton an/aus">🔊</button>
 </div>
 <div id="board" class="grid"></div> 
-<button class="btn-battle-main" onclick="openBattleSetup()">⚔️ KAMPF STARTEN</button> 
+<div class="battle-start-bar">
+    <button class="btn-start-trainer" onclick="openBattleSetup()">⚔️ Trainer-Duell</button>
+    <button class="btn-start-wild" onclick="openWildSetup()">🌿 Wildes Pokémon</button>
+</div>
+<div id="wildHolder" style="display:none;"><div class="pkmn-list"></div></div> 
 
 <div id="battleToast"></div>
 <div id="saveBadge"></div>
@@ -311,6 +334,23 @@
         </div>
         <button class="setup-next" onclick="goToPkmnSelection()">Weiter zur Pokémon-Wahl &rarr;</button>
     </div> 
+    <div id="wildSetupView" style="display:none;">
+        <div class="setup-title">Wildes Pokémon</div>
+        <div class="wild-layout">
+            <div class="setup-side side-p1">
+                <div class="side-label">Trainer</div>
+                <div id="wildPlayerChoices" class="side-choices"></div>
+            </div>
+            <div class="setup-vs">VS</div>
+            <div class="setup-side side-p2">
+                <div class="side-label">Wildes Pokémon</div>
+                <input id="wildSearch" class="wild-search" type="text" placeholder="🔍 Pokémon suchen..." oninput="renderWildResults()" autocomplete="off">
+                <div id="wildResults" class="wild-results"></div>
+                <div id="wildPreview" class="wild-preview"></div>
+            </div>
+        </div>
+        <button class="setup-next" onclick="startWildFight()">Los geht's! &#9876;&#65039;</button>
+    </div>
     <div id="pkmnSelectView" style="display:none;"> 
         <div class="setup-title">Pokémon wählen</div>
         <div class="setup-sides">
@@ -2757,6 +2797,8 @@ let players = [], poolP1 = [], poolP2 = [], activeP1 = null, activeP2 = null, ba
 
     function openBattleSetup() { 
         poolP1 = []; poolP2 = [];
+        battleType = "trainer";
+        document.getElementById('wildSetupView').style.display='none';
         document.getElementById('setupView').style.display='block'; document.getElementById('pkmnSelectView').style.display='none'; document.getElementById('fightView').style.display='none'; document.getElementById('battleOverlay').style.display='flex'; 
         const s1 = document.getElementById('p1Sel'), s2 = document.getElementById('p2Sel'); s1.innerHTML = s2.innerHTML = ""; 
         players.forEach(p => { const n = document.getElementById(p.id).querySelector('input').value; s1.innerHTML += `<option value="${p.id}">${n}</option>`; s2.innerHTML += `<option value="${p.id}">${n}</option>`; }); 
@@ -2843,12 +2885,98 @@ let players = [], poolP1 = [], poolP2 = [], activeP1 = null, activeP2 = null, ba
 
     function removePlayer(id) { if(confirm("Löschen?")) { document.getElementById(id).remove(); players = players.filter(p => p.id !== id); } }
 
+
+    // ==========================================
+    // 🌿 WILDES POKÉMON
+    // ==========================================
+    let battleType = "trainer";
+    let wildPlayerId = null, wildPick = null, wildStage = 1;
+
+    function openWildSetup() {
+        battleType = "wild";
+        if (!players.length) return;
+        if (!wildPlayerId || !document.getElementById(wildPlayerId)) wildPlayerId = players[0].id;
+        ['setupView', 'pkmnSelectView', 'fightView'].forEach(id => document.getElementById(id).style.display = 'none');
+        document.getElementById('wildSetupView').style.display = 'block';
+        document.getElementById('battleOverlay').style.display = 'flex';
+        document.getElementById('turnIndicator').style.display = 'none';
+        renderWildPlayers();
+        renderWildResults();
+        renderWildPreview();
+    }
+
+    function renderWildPlayers() {
+        const cont = document.getElementById('wildPlayerChoices'); cont.innerHTML = "";
+        players.forEach(p => {
+            const col = document.getElementById(p.id);
+            const sprites = Array.from(col.querySelectorAll('.pkmn-card')).map(c => `<img src="${c.querySelector('.pkmn-icon-small').src}">`).join('');
+            const item = document.createElement('div');
+            item.className = 'player-choice' + (wildPlayerId === p.id ? ' selected' : '');
+            item.innerHTML = `<span class="pc-name">${col.querySelector('input').value}</span><span class="pc-team">${sprites}</span>`;
+            item.onclick = () => { wildPlayerId = p.id; renderWildPlayers(); };
+            cont.appendChild(item);
+        });
+    }
+
+    function renderWildResults() {
+        const q = document.getElementById('wildSearch').value.trim().toLowerCase();
+        const cont = document.getElementById('wildResults'); cont.innerHTML = "";
+        if (!q) return;
+        Object.keys(pokemonDB).filter(n => n.toLowerCase().includes(q)).slice(0, 24).forEach(n => {
+            const item = document.createElement('div');
+            item.className = 'wild-result' + (wildPick === n ? ' selected' : '');
+            item.innerHTML = `<img src="${pokemonDB[n].icon}">${n}`;
+            item.onclick = () => { wildPick = n; renderWildResults(); renderWildPreview(); };
+            cont.appendChild(item);
+        });
+    }
+
+    function renderWildPreview() {
+        const cont = document.getElementById('wildPreview');
+        if (!wildPick) { cont.innerHTML = ""; return; }
+        const d = pokemonDB[wildPick];
+        cont.innerHTML = `<div class="wild-preview-card"><img src="${d.icon}"><div><div class="wp-name">${wildPick}</div><div class="wp-hp">${d.hp[wildStage - 1]} KP · ${d.types.join(' / ')}</div><div class="stage-pills">${[1, 2, 3].map(st => `<button class="${st === wildStage ? 'active' : ''}" onclick="wildStage=${st}; renderWildPreview();">S${st}</button>`).join('')}</div></div></div>`;
+    }
+
+    function startWildFight() {
+        if (!wildPick) return showToast("Wähle zuerst ein wildes Pokémon!");
+        const col = document.getElementById(wildPlayerId);
+        const team = Array.from(col.querySelectorAll('.pkmn-card')).filter(c => pokemonDB[c.querySelector('input').value]);
+        const alive = team.filter(c => parseInt(c.querySelector('.hp-box').innerText) > 0);
+        if (!alive.length) return showToast("Dieser Trainer hat kein kampffähiges Pokémon!");
+
+        // Wildes Pokémon als unsichtbare Karte anlegen (gehört keinem Spieler und wird nicht gespeichert)
+        const holder = document.getElementById('wildHolder');
+        holder.querySelector('.pkmn-list').innerHTML = "";
+        addPkmn('wildHolder');
+        const wild = holder.querySelector('.pkmn-card');
+        const d = pokemonDB[wildPick];
+        wild.querySelector('input').value = wildPick;
+        wild.querySelector('.pkmn-icon-small').src = d.icon;
+        wild.dataset.kat = d.kat;
+        wild.dataset.stage = wildStage;
+        wild.dataset.maxhp = d.hp[wildStage - 1];
+        wild.querySelector('.hp-box').innerText = d.hp[wildStage - 1];
+        wild.dataset.wild = "true";
+
+        battleMode = team.length;
+        poolP1 = alive.concat(team.filter(c => !alive.includes(c)));
+        poolP2 = [wild];
+        lastCryP1 = lastCryP2 = null;
+        playMusic('battle');
+        activeP1 = poolP1[0]; activeP2 = wild; attackerSide = 1; currentRound = 1;
+        document.getElementById('turnIndicator').style.display = 'block';
+        document.getElementById('wildSetupView').style.display = 'none';
+        document.getElementById('fightView').style.display = 'block';
+        updateArena();
+    }
+
     let lastCryP1 = null, lastCryP2 = null;
     function updateArena() { 
         // Ruf abspielen, wenn ein Pokémon neu in den Kampf kommt
         if (activeP1 !== lastCryP1) { lastCryP1 = activeP1; playCry(activeP1); }
         if (activeP2 !== lastCryP2) { lastCryP2 = activeP2; const p2 = activeP2; setTimeout(() => playCry(p2), 900); }
-        const pName = attackerSide === 1 ? "SPIELER 1" : "SPIELER 2";
+        const pName = attackerSide === 1 ? "SPIELER 1" : (battleType === "wild" ? "WILDES " + activeP2.querySelector('input').value.toUpperCase() : "SPIELER 2");
         document.getElementById('turnIndicator').innerText = `RUNDE ${currentRound} - ${pName} AM ZUG`;
         renderSlot(1, activeP1, attackerSide === 1); 
         renderSlot(2, activeP2, attackerSide === 2); 
@@ -3299,6 +3427,7 @@ function getWinsNeeded(pokemonName, stage) {
   function checkEvolutionAfterRound() {
     [activeP1, activeP2].forEach((pkmn, idx) => {
         const opp = (idx === 0) ? activeP2 : activeP1;
+        if (pkmn.dataset.wild === "true") return; // Wilde Pokémon steigen nicht auf
         const myHpBox = pkmn.querySelector('.hp-box');
         const oppHpBox = opp.querySelector('.hp-box');
 
@@ -3436,8 +3565,13 @@ function showEvolutionChoice(choices, pkmn) {
         const p2L = poolP2.every(p => parseInt(p.querySelector('.hp-box').innerText) <= 0); 
         if(p1L || p2L) { 
             setTimeout(() => {
-                const winnerSel = document.getElementById(p1L ? 'p2Sel' : 'p1Sel');
-                const winnerName = winnerSel.options[winnerSel.selectedIndex]?.text || (p1L ? "Spieler 2" : "Spieler 1");
+                let winnerName;
+                if (battleType === "wild") {
+                    winnerName = p1L ? "Wildes " + poolP2[0].querySelector('input').value : document.getElementById(wildPlayerId).querySelector('input').value;
+                } else {
+                    const winnerSel = document.getElementById(p1L ? 'p2Sel' : 'p1Sel');
+                    winnerName = winnerSel.options[winnerSel.selectedIndex]?.text || (p1L ? "Spieler 2" : "Spieler 1");
+                }
                 playMusic('victory');
                 showVictory(winnerName, p1L ? 2 : 1);
             }, 500);
