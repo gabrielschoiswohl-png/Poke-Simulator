@@ -154,6 +154,41 @@
         #hitCounterDisplay { position: absolute; top: 10px; right: 15px; color: var(--danger); font-size: 24px; font-weight: bold; }
         .poisoned { border: 3px solid #9b59b6 !important; box-shadow: 0 0 15px #9b59b6 !important; }
         .poison-tag { background: #9b59b6; color: white; font-size: 10px; padding: 2px 5px; border-radius: 4px; margin-left: 5px; }
+        /* ==========================================
+           ⚔️ KAMPF-ARENA
+           ========================================== */
+        .battle-arena { gap: 10px; }
+        .fighter-slot { min-height: 0; max-width: 460px; text-align: left; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 18px; padding: 16px; backdrop-filter: blur(6px); }
+        .fighter-slot.is-attacker { border-color: #3498db !important; box-shadow: 0 0 0 1px #3498db, 0 10px 40px rgba(52,152,219,0.35); }
+        .fighter-slot.is-target { border-color: rgba(231,76,60,0.6) !important; box-shadow: 0 10px 30px rgba(231,76,60,0.15); }
+        .fighter-slot.is-waiting { opacity: 0.55; filter: grayscale(0.5); }
+        .fs-top { display: flex; gap: 14px; align-items: center; }
+        .fs-sprite { width: 110px; height: 110px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at 50% 60%, rgba(255,255,255,0.12), transparent 70%); border-radius: 14px; }
+        .fs-sprite img { width: 110px; height: 110px; object-fit: contain; image-rendering: pixelated; }
+        .fs-info { flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+        .fs-name-row { display: flex; align-items: center; gap: 8px; }
+        .fs-name { font-size: 19px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .fs-bar-row { display: flex; align-items: center; gap: 6px; }
+        .fs-label { font-size: 11px; font-weight: bold; color: var(--win); width: 18px; }
+        .fs-bar-row .hp-bar-container { margin: 0; flex-grow: 1; height: 12px; background: #111; border: 1px solid #555; }
+        .fs-hp-text { text-align: right; color: #aaa; font-size: 14px; font-weight: bold; }
+        .fs-hp-text b { color: white; font-size: 22px; }
+        .fs-ep-track { flex-grow: 1; height: 8px; background: #111; border: 1px solid #555; border-radius: 4px; overflow: hidden; }
+        .fs-ep-fill { height: 100%; background: #3498db; }
+        .fs-ep-text { font-size: 11px; color: #aaa; min-width: 28px; text-align: right; }
+        .fighter-slot .atk-grid { gap: 8px; margin-top: 14px; }
+        .fighter-slot .atk-btn { height: auto; min-height: 58px; padding: 8px 10px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--type, #888) 70%, transparent); background: linear-gradient(135deg, color-mix(in srgb, var(--type, #888) 35%, #1a1a1a), #1a1a1a 80%); display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto; text-align: left; align-items: center; transition: transform 0.1s; }
+        .fighter-slot .atk-btn:active { transform: scale(0.96); }
+        .atk-type { grid-column: 1; font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: var(--type, #aaa); font-weight: bold; }
+        .atk-name { grid-column: 1; font-size: 14px; font-weight: bold; color: white; }
+        .atk-dmg { grid-column: 2; grid-row: 1 / 3; font-size: 20px; color: white; }
+        .fs-actions { display: flex; gap: 8px; margin-top: 10px; }
+        .fs-actions button { flex: 1; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); border-radius: 12px; padding: 10px; font-size: 15px; }
+        .fs-actions button img { width: 30px; height: 30px; image-rendering: pixelated; }
+        .fs-actions .btn-switch-arena { border-color: rgba(52,152,219,0.6); }
+        .fs-actions .btn-item-arena { border-color: rgba(39,174,96,0.6); }
+        .arena-vs { font-size: 34px; font-weight: 900; font-style: italic; background: linear-gradient(135deg, #3498db, #e74c3c); -webkit-background-clip: text; background-clip: text; color: transparent; }
+        .pkball-icon { width: 26px; height: 26px; }
         #turnIndicator { text-align: center; color: var(--win); font-weight: bold; margin-bottom: 5px; font-size: 18px; text-transform: uppercase; letter-spacing: 1px; }
       /* --- AB HIER NEUE EVOLUTIONS-ANIMATION --- */
         @keyframes evoBlink {
@@ -249,7 +284,7 @@
         <div class="battle-arena"> 
             <div id="teamBallsP2" class="team-balls"></div> 
             <div id="slotP2" class="fighter-slot"></div> 
-            <div style="color:var(--win); font-weight:bold; font-size: 24px;">VS</div> 
+            <div class="arena-vs">VS</div> 
             <div id="slotP1" class="fighter-slot"></div> 
             <div id="teamBallsP1" class="team-balls"></div> 
         </div> 
@@ -338,6 +373,13 @@ document.addEventListener('click', () => {
     const imgTopBeleber = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/max-revive.png";
     const imgGegengift = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/antidote.png";
     const pkBallSprite = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png"; 
+
+    // Farben der Typen (für die Attacken-Knöpfe in der Arena)
+    const typeColors = {
+        "Normal": "#a8a77a", "Feuer": "#ee8130", "Wasser": "#6390f0", "Elektro": "#f7d02c", "Pflanze": "#7ac74c", "Eis": "#96d9d6",
+        "Kampf": "#c22e28", "Gift": "#a33ea1", "Boden": "#e2bf65", "Flug": "#a98ff3", "Psycho": "#f95587", "Käfer": "#a6b91a",
+        "Gestein": "#b6a136", "Geist": "#735797", "Drache": "#6f35fc", "Unlicht": "#705746", "Stahl": "#b7b7ce", "Fee": "#d685ad"
+    };
 
     const typeChart = {
         "Normal": { effective: [], weak: ["Gestein", "Stahl"], immune: ["Geist"] },
@@ -2739,7 +2781,18 @@ function renderSlot(side, pkmn, isAttacker) {
     const waitingClass = !isAttacker ? "is-waiting" : "";
 
     slot.className = `fighter-slot ${isAttacker ? 'is-attacker' : 'is-target'} ${isPoisoned ? 'poisoned' : ''} ${waitingClass}`; 
-    let content = `<img src="${pkmn.querySelector('.pkmn-icon-small').src}" style="height:80px;"><br><b>${name}</b> <span class="stage-tag">S${stage}</span>${isPoisoned ? '<span class="poison-tag">GIFT</span>' : ''}<div class="hp-bar-container"><div class="hp-bar-fill" style="width: ${percent}%; background-color: ${hpColor};"></div></div><div style="font-size: 14px; font-weight: bold;">HP: ${currentHp} / ${maxHp}</div>`; 
+    const wins = parseInt(pkmn.dataset.wins) || 0;
+    const winsNeeded = getWinsNeeded(name, parseInt(stage) || 1) || 2;
+    const winPercent = Math.min(100, wins / winsNeeded * 100);
+    let content = `<div class="fs-top">
+        <div class="fs-sprite"><img src="${pkmn.querySelector('.pkmn-icon-small').src}"></div>
+        <div class="fs-info">
+            <div class="fs-name-row"><span class="stage-tag">S${stage}</span><b class="fs-name">${name}</b>${isPoisoned ? '<span class="poison-tag">GIFT</span>' : ''}</div>
+            <div class="fs-bar-row"><span class="fs-label">KP</span><div class="hp-bar-container"><div class="hp-bar-fill" style="width: ${percent}%; background-color: ${hpColor};"></div></div></div>
+            <div class="fs-hp-text"><b>${currentHp}</b> / ${maxHp}</div>
+            <div class="fs-bar-row"><span class="fs-label">EP</span><div class="fs-ep-track"><div class="fs-ep-fill" style="width:${winPercent}%;"></div></div><span class="fs-ep-text">${wins}/${winsNeeded}</span></div>
+        </div>
+    </div>`; 
     
     // Spieler 1 greift zuerst an: ist sein Pokémon zu Rundenbeginn besiegt (z. B. durch Gift), muss er wechseln
     if(currentHp <= 0 && (attackerSide !== side || side === 1)) {
@@ -2759,15 +2812,15 @@ function renderSlot(side, pkmn, isAttacker) {
                 if (a.n === "Wandler") {
                     atks += `<button class="atk-btn" onclick="triggerAtk(0, 'Normal', event, 1, 'Wandler')">Wandler</button>`;
                 } else {
-                    atks += `<button class="atk-btn" onclick="triggerAtk(${a.d}, '${a.t}', event, ${a.m || 1}, '${a.n}')">${a.n}<br><b>${a.d}</b></button>`;
+                    atks += `<button class="atk-btn" style="--type:${typeColors[a.t] || '#888'}" onclick="triggerAtk(${a.d}, '${a.t}', event, ${a.m || 1}, '${a.n}')"><span class="atk-type">${a.t}</span><span class="atk-name">${a.n}</span><b class="atk-dmg">${a.d}</b></button>`;
                 }
             });
         }
         
         content += atks + `</div>
-            <div style="display:flex; gap:5px; margin-top:10px;">
-                <button class="btn-switch-arena" style="width:50%;" onclick="openSwitchMenu(${side}, false)">♻️ Wechseln</button>
-                <button class="btn-item-arena" style="width:50%;" onclick="openItemMenu(${side})">🧪 Items</button>
+            <div class="fs-actions">
+                <button class="btn-switch-arena" onclick="openSwitchMenu(${side}, false)"><img src="${pkBallSprite}">Wechseln</button>
+                <button class="btn-item-arena" onclick="openItemMenu(${side})"><img src="${imgTrank}">Items</button>
             </div>`; 
     } 
     slot.innerHTML = content; 
