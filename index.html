@@ -455,7 +455,7 @@ audioTracks.choose.loop = true;
 // Kampfmusik fürs Trainer-Duell: bei jedem Kampf zufällig eines dieser Lieder (Ordner sounds/kampf)
 const battleSongs = ['champ.mp3', 'lets-go.mp3', 'kolosseum-runde1.mp3', 'kolosseum-finale.mp3', 'top-vier.mp3', 'arenaleiter.mp3'];
 // Musik für Kämpfe gegen wilde Pokémon (Ordner sounds/wild)
-const wildSongs = ['gold-silber.mp3', 'heartgold.mp3', 'smaragd.mp3', 'feuerrot.mp3', 'rot-blau.mp3'];
+const wildSongs = [/* 'gold-silber.mp3', */ 'heartgold.mp3', 'smaragd.mp3', /* 'feuerrot.mp3', */ 'rot-blau.mp3', 'wild-pokemon.mp3', 'normaler-kampf.mp3'];
 function playBattleMusic(wild = false) {
     const list = wild ? wildSongs : battleSongs;
     const song = list[Math.floor(Math.random() * list.length)];
