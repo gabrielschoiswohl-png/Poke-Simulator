@@ -441,15 +441,45 @@
 </div> 
 
 <script> 
+    // Übersichtsmusik: 3 aneinandergereihte Teile (ca. je 25 Min.). Teil und Sekunde werden am Gerät gemerkt,
+    // damit die Musik nach einem Kampf oder Neuladen dort weiterläuft, wo sie war.
+    const overviewMusic = (() => {
+        const PARTS = ['sounds/uebersicht-1.mp3', 'sounds/uebersicht-2.mp3', 'sounds/uebersicht-3.mp3'];
+        const KEY = 'pokeSimulatorOverviewMusic';
+        const a = new Audio();
+        a.preload = 'auto';
+        let part = 0, seekTo = 0;
+        try {
+            const s = JSON.parse(localStorage.getItem(KEY));
+            if (s && s.part >= 0 && s.part < PARTS.length) { part = s.part; seekTo = s.time || 0; }
+        } catch (e) {}
+        const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ part, time: a.currentTime || seekTo })); } catch (e) {} };
+        const load = i => { part = i; a.src = PARTS[i]; };
+        load(part);
+        a.addEventListener('loadedmetadata', () => {
+            if (seekTo > 0 && seekTo < a.duration) { try { a.currentTime = seekTo; } catch (e) {} }
+            seekTo = 0;
+        });
+        a.addEventListener('ended', () => { seekTo = 0; load((part + 1) % PARTS.length); a.play().catch(() => {}); save(); });
+        setInterval(() => { if (!a.paused) save(); }, 2000);
+        document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
+        window.addEventListener('pagehide', save);
+        return {
+            audio: a,
+            play() { return a.play(); },
+            pause() { a.pause(); save(); },
+            set currentTime(v) { /* bewusst ignoriert: die Übersichtsmusik läuft immer weiter */ },
+            get currentTime() { return a.currentTime; }
+        };
+    })();
     const audioTracks = {
-    arena: new Audio('sounds/uebersicht.mp3'), // Übersichtsbildschirm
+    arena: overviewMusic, // Übersichtsbildschirm
     choose: new Audio('sounds/pokemon-wahl.mp3'), // Trainer-Duell: von der Auswahl bis zum Kampfbeginn
     battle: null, // wird bei jedem Trainer-Duell zufällig gewählt, siehe playBattleMusic()
     victory: new Audio('sounds/sieg.mp3')
 };
 
 // Musik-Schleifen im Hintergrund aktivieren
-audioTracks.arena.loop = true;
 audioTracks.choose.loop = true;
 
 // Kampfmusik fürs Trainer-Duell: bei jedem Kampf zufällig eines dieser Lieder (Ordner sounds/kampf)
