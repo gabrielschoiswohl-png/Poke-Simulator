@@ -442,15 +442,15 @@
 
 <script> 
     const audioTracks = {
-    // Tausche die URLs hier gegen deine eigenen Dropbox- oder Discord-Links aus!
-    arena: new Audio('https://actions.google.com/sounds/v1/ambiences/morning_birds.ogg'), 
+    arena: new Audio('sounds/uebersicht.mp3'), // Übersichtsbildschirm
+    choose: new Audio('sounds/pokemon-wahl.mp3'), // Trainer-Duell: von der Auswahl bis zum Kampfbeginn
     battle: null, // wird bei jedem Trainer-Duell zufällig gewählt, siehe playBattleMusic()
-    victory: new Audio('sounds/sieg.mp3'),
-    evolution: new Audio('https://actions.google.com/sounds/v1/science_fiction/alien_beacon.ogg') 
+    victory: new Audio('sounds/sieg.mp3')
 };
 
 // Musik-Schleifen im Hintergrund aktivieren
 audioTracks.arena.loop = true;
+audioTracks.choose.loop = true;
 
 // Kampfmusik fürs Trainer-Duell: bei jedem Kampf zufällig eines dieser Lieder (Ordner sounds/kampf)
 const battleSongs = ['arenaleiter.mp3', 'trainer-johto.mp3', 'champ.mp3', 'top-vier.mp3', 'troy.mp3'];
@@ -2833,6 +2833,7 @@ let players = [], poolP1 = [], poolP2 = [], activeP1 = null, activeP2 = null, ba
     function openBattleSetup() { 
         poolP1 = []; poolP2 = [];
         battleType = "trainer";
+        playMusic('choose');
         document.getElementById('wildSetupView').style.display='none';
         document.getElementById('setupView').style.display='block'; document.getElementById('pkmnSelectView').style.display='none'; document.getElementById('fightView').style.display='none'; document.getElementById('battleOverlay').style.display='flex'; 
         const s1 = document.getElementById('p1Sel'), s2 = document.getElementById('p2Sel'); s1.innerHTML = s2.innerHTML = ""; 

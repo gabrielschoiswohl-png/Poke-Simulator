@@ -5,3 +5,5 @@
 - `wild/`: Musik für Kämpfe gegen wilde Pokémon, zufällig, Liste `wildSongs`.
 - `entwicklung.mp3`: läuft während der Entwicklungs-Animation.
 - `heilen.mp3`, `level-up.mp3`, `sieg.mp3`: Effekte.
+- uebersicht.mp3 – Musik im Übersichtsbildschirm (erste 20 Min. von Omega Rubin/Alpha Saphir Relaxing Music)
+- pokemon-wahl.mp3 – Choose Your Pokémon, läuft beim Trainer-Duell bis der Kampf beginnt
