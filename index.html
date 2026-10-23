@@ -3323,7 +3323,7 @@ function renderSlot(side, pkmn, isAttacker) {
         const menu = document.getElementById('switchMenu'), grid = document.getElementById('switchGrid'); const pool = side === 1 ? poolP1 : poolP2; 
         if(pool.every(p => parseInt(p.querySelector('.hp-box').innerText) <= 0)) return; 
         menu.style.display = 'flex'; grid.innerHTML = ""; document.getElementById('cancelSwitch').style.display = isForced ? 'none' : 'block'; 
-        pool.forEach(p => { if(p === (side === 1 ? activeP1 : activeP2)) return; const hp = parseInt(p.querySelector('.hp-box').innerText); const card = document.createElement('div'); card.className = `switch-card ${hp <= 0 ? 'fainted' : ''}`; card.style.setProperty('--side', side === 1 ? '#3498db' : '#e74c3c'); card.innerHTML = pokemonCardHtml(p); if(hp > 0) { card.onclick = () => { clearConfusion(side === 1 ? activeP1 : activeP2); if(side === 1) activeP1 = p; else activeP2 = p; menu.style.display = 'none'; updateArena(); }; } grid.appendChild(card); }); 
+        pool.forEach(p => { if(p === (side === 1 ? activeP1 : activeP2)) return; const hp = parseInt(p.querySelector('.hp-box').innerText); const card = document.createElement('div'); card.className = `switch-card ${hp <= 0 ? 'fainted' : ''}`; card.style.setProperty('--side', side === 1 ? '#3498db' : '#e74c3c'); card.innerHTML = pokemonCardHtml(p); if(hp > 0) { card.onclick = () => { clearConfusion(side === 1 ? activeP1 : activeP2, true); if(side === 1) activeP1 = p; else activeP2 = p; menu.style.display = 'none'; updateArena(); }; } grid.appendChild(card); }); 
     }
 
 function openItemMenu(side) {
@@ -3554,9 +3554,15 @@ function dittoTransform(side) {
     // Verwirrung: Daneben = Selbstschaden, Treffer = Verwirrung vorbei
     const CONFUSE_SELF_DMG = 20;
     // Schaden, den jedes Pokémon einem Gegner zugefügt hat (für den Außenseiter-Bonus)
-    let cardUidCounter = 0;
-    function cardUid(card) { if (!card.dataset.uid) card.dataset.uid = 'c' + (++cardUidCounter); return card.dataset.uid; }
-    function clearConfusion(card) { if (card) { card.removeAttribute('data-dmg-by'); card.removeAttribute('data-confused'); card.removeAttribute('data-asleep'); card.removeAttribute('data-counter'); } }
+    // Gezählt wird pro Team (Spieler): Schaden aller Pokémon eines Spielers, auch Gift und zurückgeworfener Konter-Schaden
+    function teamKey(card) { return card.closest('.player-col')?.id || 'wild'; }
+    function addDamageRecord(victim, source, amount) {
+        if (amount <= 0) return;
+        let by = {}; try { by = JSON.parse(victim.dataset.dmgBy || '{}'); } catch (e) {}
+        const k = teamKey(source); by[k] = (by[k] || 0) + amount;
+        victim.dataset.dmgBy = JSON.stringify(by);
+    }
+    function clearConfusion(card, keepDmg) { if (card) { if (!keepDmg) card.removeAttribute('data-dmg-by'); card.removeAttribute('data-confused'); card.removeAttribute('data-asleep'); card.removeAttribute('data-counter'); } }
 
     function processHit(type) { 
         const atkCard = attackerSide === 1 ? activeP1 : activeP2;
@@ -3678,7 +3684,9 @@ function dittoTransform(side) {
         if (counterResult === 'hit' && totalDamage > 0) {
             reflectedDamage = Math.floor(totalDamage / 2);
             const aHp = attacker.querySelector('.hp-box');
-            aHp.innerText = Math.max(0, parseInt(aHp.innerText) - reflectedDamage);
+            const aBefore = parseInt(aHp.innerText);
+            aHp.innerText = Math.max(0, aBefore - reflectedDamage);
+            addDamageRecord(attacker, target, aBefore - parseInt(aHp.innerText));
         }
         totalDamage = 0;
     }
@@ -3728,11 +3736,7 @@ if (isPoisonAttack && !isImmune && !counterResult) {
     const hpBox = target.querySelector('.hp-box'); 
     let oldHp = parseInt(hpBox.innerText), newHp = Math.max(0, oldHp - totalDamage); 
     hpBox.innerText = newHp; 
-    if (oldHp > newHp) {
-        let by = {}; try { by = JSON.parse(target.dataset.dmgBy || '{}'); } catch (e) {}
-        const uid = cardUid(attacker); by[uid] = (by[uid] || 0) + (oldHp - newHp);
-        target.dataset.dmgBy = JSON.stringify(by);
-    }
+    addDamageRecord(target, attacker, oldHp - newHp);
     document.getElementById('diceModal').style.display = 'none'; 
 
     // Treffer-Meldung (Aussehen oben im Abschnitt "TREFFER-MELDUNG GESTALTEN")
@@ -3845,12 +3849,12 @@ function getWinsNeeded(pokemonName, stage) {
             let s = parseInt(pkmn.dataset.stage);
             const curName = pkmn.querySelector('input').value;
 
-            // Außenseiter-Sieg: höhere Kat. besiegt und mindestens die Hälfte der KP selbst abgezogen (kein bloßes Wechseln zum Finishen)
+            // Außenseiter-Sieg: höhere Kat. besiegt und mindestens die Hälfte der KP vom Team abgezogen (kein bloßes Finishen eines Gegners, den andere weichgeklopft haben)
             let winGain = 1;
             const ownKat = pokemonDB[curName]?.kat || 1;
             const oppKat = pokemonDB[opp.querySelector('input').value]?.kat || 1;
             let dealtBy = {}; try { dealtBy = JSON.parse(opp.dataset.dmgBy || '{}'); } catch (e) {}
-            if (oppKat > ownKat && (dealtBy[cardUid(pkmn)] || 0) >= (parseInt(opp.dataset.maxhp) || 0) / 2) {
+            if (oppKat > ownKat && (dealtBy[teamKey(pkmn)] || 0) >= (parseInt(opp.dataset.maxhp) || 0) / 2) {
                 winGain = 2;
                 showToast("Außenseiter-Sieg! +2 EP");
             }
@@ -4072,6 +4076,7 @@ function showEvolutionChoice(choices, pkmn) {
                 let dmg = parseInt(p.dataset.poisonDmg) || 10;
                 let newHp = Math.max(0, hp - dmg);
                 hpBox.innerText = newHp;
+                if (attacker) addDamageRecord(p, attacker, hp - newHp);
                 
                 showToast(p.querySelector('input').value + " leidet unter Gift (-" + dmg + " HP)!");
             }
