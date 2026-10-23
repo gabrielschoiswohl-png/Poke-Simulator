@@ -3187,7 +3187,7 @@ function renderSlot(side, pkmn, isAttacker) {
     let content = `<div class="fs-top">
         <div class="fs-sprite"><img src="${pkmn.querySelector('.pkmn-icon-small').src}"></div>
         <div class="fs-info">
-            <div class="fs-name-row"><span class="stage-tag">S${stage}</span><b class="fs-name">${name}</b>${isPoisoned ? '<span class="poison-tag">GIFT</span>' : ''}${pkmn.dataset.confused === "true" ? '<span class="confuse-tag">VERWIRRT</span>' : ''}</div>
+            <div class="fs-name-row"><span class="stage-tag">S${stage}</span><b class="fs-name">${name}</b>${isPoisoned ? '<span class="poison-tag">GIFT</span>' : ''}${pkmn.dataset.confused === "true" ? '<span class="confuse-tag">VERWIRRT</span>' : ''}${pkmn.dataset.asleep === "true" ? '<span class="confuse-tag">SCHLÄFT</span>' : ''}</div>
             <div class="fs-bar-row"><span class="fs-label">KP</span><div class="hp-bar-container"><div class="hp-bar-fill" style="width: ${percent}%; background-color: ${hpColor};"></div></div></div>
             <div class="fs-hp-text"><b>${currentHp}</b> / ${maxHp}</div>
             <div class="fs-bar-row"><span class="fs-label">EP</span><div class="fs-ep-track"><div class="fs-ep-fill" style="width:${winPercent}%;"></div></div><span class="fs-ep-text">${wins}/${winsNeeded}</span></div>
@@ -3347,9 +3347,13 @@ function openItemMenu(side) {
         multiHitCount = 0; accumulatedHitsDmg = 0; totalCritBonus = 0;
         
         const atkCard = attackerSide === 1 ? activeP1 : activeP2;
+        const asleepNow = atkCard && atkCard.dataset.asleep === "true";
         const confusedNow = atkCard && atkCard.dataset.confused === "true";
-        document.getElementById('confuseDmgTxt').innerText = CONFUSE_SELF_DMG;
-        document.getElementById('confuseHint').style.display = confusedNow ? 'block' : 'none';
+        const hint = document.getElementById('confuseHint');
+        hint.innerHTML = asleepNow
+            ? '😴 Schläft: mit dem D6 würfeln!<br>1 bis 3 = schläft weiter (kein Angriff), 4 bis 6 = wacht auf und greift an'
+            : `😵 Verwirrt: mit dem D6 würfeln!<br>1 bis 3 = daneben (${CONFUSE_SELF_DMG} Selbstschaden), 4 bis 6 = Treffer`;
+        hint.style.display = (asleepNow || confusedNow) ? 'block' : 'none';
 
         document.getElementById('diceModal').style.display='block'; 
         document.getElementById('hitSelection').style.display='flex'; 
@@ -3380,11 +3384,18 @@ function dittoTransform(side) {
 }
     // Verwirrung: Daneben = Selbstschaden, Treffer = Verwirrung vorbei
     const CONFUSE_SELF_DMG = 20;
-    function clearConfusion(card) { if (card) card.removeAttribute('data-confused'); }
+    function clearConfusion(card) { if (card) { card.removeAttribute('data-confused'); card.removeAttribute('data-asleep'); } }
 
     function processHit(type) { 
         const atkCard = attackerSide === 1 ? activeP1 : activeP2;
-        const wasConfused = atkCard && atkCard.dataset.confused === "true" && multiHitCount === 0;
+        const wasAsleep = atkCard && atkCard.dataset.asleep === "true" && multiHitCount === 0;
+        const wasConfused = atkCard && (atkCard.dataset.confused === "true" || wasAsleep) && multiHitCount === 0;
+        if (wasAsleep && type === 'miss') {
+            document.getElementById('diceModal').style.display = 'none';
+            showHitPopup("SCHLÄFT!", atkCard.querySelector('input').value + " schläft weiter und greift nicht an", "miss");
+            endTurn();
+            return;
+        }
         if (wasConfused && type === 'miss') {
             const hpBox = atkCard.querySelector('.hp-box');
             hpBox.innerText = Math.max(0, parseInt(hpBox.innerText) - CONFUSE_SELF_DMG);
@@ -3393,7 +3404,7 @@ function dittoTransform(side) {
             endTurn();
             return;
         }
-        if (wasConfused) { clearConfusion(atkCard); showToast(atkCard.querySelector('input').value + " ist nicht mehr verwirrt!"); }
+        if (wasConfused) { clearConfusion(atkCard); showToast(atkCard.querySelector('input').value + (wasAsleep ? " ist aufgewacht!" : " ist nicht mehr verwirrt!")); }
         if(type === 'miss') { 
             if(multiHitCount > 0) showDiceSelection();
             else { document.getElementById('diceModal').style.display='none'; showHitPopup("MISS!", "", "miss"); endTurn(); }
@@ -3547,6 +3558,7 @@ if (isPoisonAttack && !isImmune) {
         if (chosenAtk.effect === "confuse") {
             if (parseInt(target.querySelector('.hp-box').innerText) > 0) { target.dataset.confused = "true"; showToast(targetName + " wurde verwirrt!"); }
         }
+        if (chosenAtk.effect === "sleep" && parseInt(target.querySelector('.hp-box').innerText) > 0) target.dataset.asleep = "true";
         if (chosenAtk.effect === "sleep") showToast(targetName + " schläft ein!" + (battleType === "wild" && target.dataset.wild === "true" ? " Fangversuch erlaubt, auch ohne Mindestschaden!" : ""), 3500);
         if (isPoisonAttack) showToast(targetName + " wurde vergiftet!");
         document.getElementById('diceModal').style.display = 'none';
