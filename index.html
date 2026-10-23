@@ -682,7 +682,9 @@ document.addEventListener('click', () => {
     const TM_DEFS = [
         { id: 'TM01', kat: 1, types: null,                          atk: { n: "Powerpunch", d: 80,  s: 1, t: "Kampf", die: "D12" }, img: "tm-fighting" },
         { id: 'TM03', kat: 1, types: ["Wasser", "Eis"],             atk: { n: "Aquawelle",  d: 90,  s: 1, t: "Wasser", die: "D12" }, img: "tm-water" },
-        { id: 'TM14', kat: 3, types: ["Eis", "Wasser", "Drache"],   atk: { n: "Blizzard",   d: 120, s: 1, t: "Eis", die: "D12" }, img: "tm-ice" }
+        { id: 'TM14', kat: 3, types: ["Eis", "Wasser", "Drache"],   atk: { n: "Blizzard",   d: 120, s: 1, t: "Eis", die: "D12" }, img: "tm-ice" },
+        { id: 'TM15', kat: 3, types: null,                          atk: { n: "Hyperstrahl", d: 130, s: 1, t: "Normal", die: "D6" }, img: "tm-normal" },
+        { id: 'TM33', kat: 2, types: null,                          atk: { n: "Eishieb",    d: 100, s: 1, t: "Eis", die: "D12" }, img: "tm-ice" }
     ];
     const tmImg = tm => "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/" + tm.img + ".png";
 
