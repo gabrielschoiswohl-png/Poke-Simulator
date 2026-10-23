@@ -133,7 +133,11 @@
 
         #switchMenu, #itemMenu { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 5000; display: none; flex-direction: column; padding: 20px; box-sizing: border-box; } 
         .switch-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; } 
-        .switch-card { background: #333; padding: 15px; border-radius: 10px; text-align: center; border: 2px solid #555; } 
+        .switch-card { --side: #3498db; background: linear-gradient(135deg, color-mix(in srgb, var(--side) 35%, #1a1a1a), #1a1a1a 80%); padding: 15px; border-radius: 12px; text-align: center; border: 1px solid color-mix(in srgb, var(--side) 70%, transparent); cursor: pointer; font-weight: bold; }
+        .switch-card.fainted { filter: grayscale(1); opacity: 0.45; cursor: default; }
+        #itemGrid .btn-action { background: linear-gradient(135deg, color-mix(in srgb, var(--c, #888) 35%, #1a1a1a), #1a1a1a 80%); border: 1px solid color-mix(in srgb, var(--c, #888) 70%, transparent); border-radius: 12px; font-size: 14px; gap: 6px; }
+        #itemGrid .btn-action img { width: 34px; height: 34px; margin: 0; image-rendering: pixelated; }
+        #itemGrid .potion { --c: #6c5ce7; } #itemGrid .super { --c: #fd9644; } #itemGrid .hyper { --c: #ff78ae; } #itemGrid .revive { --c: #d4ac0d; } #itemGrid .max-revive { --c: #c0392b; } #itemGrid .antidote { --c: #9b59b6; }
         
         #diceModal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #333; border: 2px solid var(--win); border-radius: 15px; padding: 20px; z-index: 4000; display: none; width: 85%; max-width: 320px; text-align: center; } 
         .dice-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 15px; } 
@@ -3223,7 +3227,7 @@ function renderSlot(side, pkmn, isAttacker) {
         const menu = document.getElementById('switchMenu'), grid = document.getElementById('switchGrid'); const pool = side === 1 ? poolP1 : poolP2; 
         if(pool.every(p => parseInt(p.querySelector('.hp-box').innerText) <= 0)) return; 
         menu.style.display = 'flex'; grid.innerHTML = ""; document.getElementById('cancelSwitch').style.display = isForced ? 'none' : 'block'; 
-        pool.forEach(p => { if(p === (side === 1 ? activeP1 : activeP2)) return; const hp = parseInt(p.querySelector('.hp-box').innerText); const card = document.createElement('div'); card.className = `switch-card ${hp <= 0 ? 'fainted' : ''}`; card.innerHTML = `<img src="${p.querySelector('.pkmn-icon-small').src}" style="height:50px;"><br>${p.querySelector('input').value}<br>HP: ${hp}`; if(hp > 0) { card.onclick = () => { if(side === 1) activeP1 = p; else activeP2 = p; menu.style.display = 'none'; updateArena(); }; } grid.appendChild(card); }); 
+        pool.forEach(p => { if(p === (side === 1 ? activeP1 : activeP2)) return; const hp = parseInt(p.querySelector('.hp-box').innerText); const card = document.createElement('div'); card.className = `switch-card ${hp <= 0 ? 'fainted' : ''}`; card.style.setProperty('--side', side === 1 ? '#3498db' : '#e74c3c'); card.innerHTML = `<img src="${p.querySelector('.pkmn-icon-small').src}" style="height:50px;"><br>${p.querySelector('input').value}<br>HP: ${hp}`; if(hp > 0) { card.onclick = () => { if(side === 1) activeP1 = p; else activeP2 = p; menu.style.display = 'none'; updateArena(); }; } grid.appendChild(card); }); 
     }
 
 function openItemMenu(side) {
@@ -3236,7 +3240,7 @@ function openItemMenu(side) {
             <button class="btn-action hyper" style="min-height:80px;" onclick="applyBattleItem(${side}, 'heal', 9999)"><img src="${imgHyper}">Hyper-T. (MAX)</button>
             <button class="btn-action revive" style="min-height:80px;" onclick="applyBattleItem(${side}, 'revive', 160)"><img src="${imgBeleber}">Beleber (160)</button>
             <button class="btn-action max-revive" style="min-height:80px;" onclick="applyBattleItem(${side}, 'revive', 9999)"><img src="${imgTopBeleber}">Top-Bel. (MAX)</button>
-            <button class="btn-action antidote" style="min-height:80px; background-color: #9b59b6; color: white;" onclick="applyBattleItem(${side}, 'antidote', 0)"><img src="${imgGegengift}">Gegengift</button>
+            <button class="btn-action antidote" style="min-height:80px;" onclick="applyBattleItem(${side}, 'antidote', 0)"><img src="${imgGegengift}">Gegengift</button>
         `;
     }
 
