@@ -454,6 +454,11 @@
         <button class="dice-btn hit-hit" onclick="processHit('hit')">HIT</button> 
         <button class="dice-btn hit-crit" onclick="processHit('crit')">CRIT</button> 
     </div> 
+    <div id="counterSelection" class="hit-choice" style="display:none;">
+        <button class="dice-btn hit-miss" onclick="setCounter('miss')">MISS<small>kein Konter</small></button>
+        <button class="dice-btn" onclick="setCounter('block')">BLOCK<small>nur abwehren</small></button>
+        <button class="dice-btn hit-hit" onclick="setCounter('hit')">HIT<small>perfekt</small></button>
+    </div>
     <div id="diceSelection" style="display:none;"> 
         <div class="dice-sub" style="margin-top:12px;">Würfel</div>
         <div class="dice-grid"> 
@@ -2078,10 +2083,10 @@ document.addEventListener('click', () => {
         hp: [200, 220, 240],
         types: ["Psycho"],
         atks: [
-            { n: "Konter", s: 1, t: "Normal", effect: "counter" },
-            { n: "Spiegelcape", s: 2, t: "Psycho", effect: "counter" },
-            { n: "Konter", s: 3, t: "Normal", effect: "counter" },
-            { n: "Spiegelcape", s: 3, t: "Psycho", effect: "counter" }
+            { n: "Konter", d: 0, s: 1, t: "Normal", effect: "counter" },
+            { n: "Spiegelcape", d: 0, s: 2, t: "Psycho", effect: "counter" },
+            { n: "Konter", d: 0, s: 3, t: "Normal", effect: "counter" },
+            { n: "Spiegelcape", d: 0, s: 3, t: "Psycho", effect: "counter" }
         ]
     },
       "Karnimani": {
@@ -3187,7 +3192,7 @@ function renderSlot(side, pkmn, isAttacker) {
     let content = `<div class="fs-top">
         <div class="fs-sprite"><img src="${pkmn.querySelector('.pkmn-icon-small').src}"></div>
         <div class="fs-info">
-            <div class="fs-name-row"><span class="stage-tag">S${stage}</span><b class="fs-name">${name}</b>${isPoisoned ? '<span class="poison-tag">GIFT</span>' : ''}${pkmn.dataset.confused === "true" ? '<span class="confuse-tag">VERWIRRT</span>' : ''}${pkmn.dataset.asleep === "true" ? '<span class="confuse-tag">SCHLÄFT</span>' : ''}</div>
+            <div class="fs-name-row"><span class="stage-tag">S${stage}</span><b class="fs-name">${name}</b>${isPoisoned ? '<span class="poison-tag">GIFT</span>' : ''}${pkmn.dataset.confused === "true" ? '<span class="confuse-tag">VERWIRRT</span>' : ''}${pkmn.dataset.asleep === "true" ? '<span class="confuse-tag">SCHLÄFT</span>' : ''}${pkmn.dataset.counter ? '<span class="confuse-tag" style="background:#3498db;">KONTER</span>' : ''}</div>
             <div class="fs-bar-row"><span class="fs-label">KP</span><div class="hp-bar-container"><div class="hp-bar-fill" style="width: ${percent}%; background-color: ${hpColor};"></div></div></div>
             <div class="fs-hp-text"><b>${currentHp}</b> / ${maxHp}</div>
             <div class="fs-bar-row"><span class="fs-label">EP</span><div class="fs-ep-track"><div class="fs-ep-fill" style="width:${winPercent}%;"></div></div><span class="fs-ep-text">${wins}/${winsNeeded}</span></div>
@@ -3355,8 +3360,18 @@ function openItemMenu(side) {
             : `😵 Verwirrt: mit dem D6 würfeln!<br>1 bis 3 = daneben (${CONFUSE_SELF_DMG} Selbstschaden), 4 bis 6 = Treffer`;
         hint.style.display = (asleepNow || confusedNow) ? 'block' : 'none';
 
+        const atkName = atkCard ? atkCard.querySelector('input').value : '';
+        const atkDef = pokemonDB[atkName]?.atks.find(a => a.n === name);
+        const isCounter = !!(atkDef && atkDef.effect === 'counter') || (atkCard && atkCard.dataset.isTransformed === "true" && name !== '' && (JSON.parse(atkCard.dataset.transformedAtks || '[]').find(a => a.n === name) || {}).effect === 'counter');
+        if (isCounter) {
+            const foe = attackerSide === 1 ? activeP2 : activeP1;
+            const foeKat = pokemonDB[foe.querySelector('input').value]?.kat || foe.dataset.kat || '?';
+            hint.innerHTML = `Chip auf der Fangskala genau auf Kat. ${foeKat} (Kat. des Gegners)?<br>MISS = daneben, BLOCK = nicht perfekt, HIT = perfekt`;
+            hint.style.display = 'block';
+        }
         document.getElementById('diceModal').style.display='block'; 
-        document.getElementById('hitSelection').style.display='flex'; 
+        document.getElementById('hitSelection').style.display = isCounter ? 'none' : 'flex'; 
+        document.getElementById('counterSelection').style.display = isCounter ? 'flex' : 'none';
         document.getElementById('diceSelection').style.display='none';
         updateHitCounterUI();
     }
@@ -3384,7 +3399,7 @@ function dittoTransform(side) {
 }
     // Verwirrung: Daneben = Selbstschaden, Treffer = Verwirrung vorbei
     const CONFUSE_SELF_DMG = 20;
-    function clearConfusion(card) { if (card) { card.removeAttribute('data-confused'); card.removeAttribute('data-asleep'); } }
+    function clearConfusion(card) { if (card) { card.removeAttribute('data-confused'); card.removeAttribute('data-asleep'); card.removeAttribute('data-counter'); } }
 
     function processHit(type) { 
         const atkCard = attackerSide === 1 ? activeP1 : activeP2;
@@ -3421,45 +3436,21 @@ function dittoTransform(side) {
         document.getElementById('hitSelection').style.display='none'; 
         document.getElementById('diceSelection').style.display='block';
     }
-    function showCounterUI(attacker, target) {
-    // Hole den Schaden, den Woingenau zuletzt kassiert hat
-    // Wir nutzen das Dataset des Angreifers, um zu sehen, was er zuletzt abbekommen hat
-    // Regelbuch: Bei perfektem Chip bekommt der Gegner die Hälfte seines Attackenschadens zurück
-    let reflectedDamage = Math.floor((parseInt(attacker.dataset.lastIncomingDamage) || 0) / 2);
-    const targetKat = pokemonDB[target.querySelector('input').value]?.kat || target.dataset.kat || '?';
+    // Konter / Spiegelcape: wird vor dem Angriff des Gegners gewählt (BLOCK, HIT oder MISS auf der Fangskala)
+    function setCounter(result) {
+        const card = attackerSide === 1 ? activeP1 : activeP2;
+        const name = card.querySelector('input').value;
+        document.getElementById('diceModal').style.display = 'none';
+        if (result === 'miss') {
+            card.removeAttribute('data-counter');
+            showHitPopup("MISS!", currentAtkName + " ist danebengegangen", "miss");
+        } else {
+            card.dataset.counter = result;
+            showToast(name + " ist bereit: " + currentAtkName + (result === 'hit' ? " perfekt!" : " (Abwehr)"));
+        }
+        endTurn();
+    }
 
-    // Erstelle ein einfaches Dialog-Overlay
-    const counterOverlay = document.createElement('div');
-    counterOverlay.id = "counterOverlay";
-    counterOverlay.innerHTML = `
-        <div style="background:white; padding:20px; border:2px solid black;">
-            <h3>Konter-Modus!</h3>
-            <p>Chip genau auf Kat. ${targetKat} (Kat. des Gegners) auf der Fangskala?</p>
-            <button id="btnHit">Perfekt (Reflektieren: ${reflectedDamage} Schaden)</button>
-            <button id="btnMiss">Nur Abwehr</button>
-        </div>
-    `;
-    document.body.appendChild(counterOverlay);
-
-    // Hit-Logik
-    document.getElementById('btnHit').onclick = () => {
-        target.querySelector('.hp-box').innerText = Math.max(0, parseInt(target.querySelector('.hp-box').innerText) - reflectedDamage);
-        showToast("Konter erfolgreich! " + reflectedDamage + " Schaden reflektiert.");
-        closeCounter();
-    };
-
-    // Miss-Logik
-    document.getElementById('btnMiss').onclick = () => {
-        showToast("Attacke abgewehrt.");
-        closeCounter();
-    };
-}
-
-function closeCounter() {
-    document.getElementById('counterOverlay').remove();
-    document.getElementById('diceModal').style.display = 'none';
-    endTurn();
-}
  function finishDamage(roll) { 
     const attacker = attackerSide === 1 ? activeP1 : activeP2; 
     const target = attackerSide === 1 ? activeP2 : activeP1;
@@ -3473,14 +3464,6 @@ function closeCounter() {
     const attackerStage = parseInt(attacker.dataset.stage) || 1;
     let chosenAtk = (attackerData) ? attackerData.atks.filter(a => a.n === currentAtkName && a.s <= attackerStage).sort((x, y) => y.s - x.s)[0] || attackerData.atks.find(a => a.n === currentAtkName) : null;
 
-    // 1. NEU: Counter/Spiegelcape Logik
-    if (chosenAtk && chosenAtk.effect === "counter") {
-        // Hier speichern wir den Schaden, der gerade vom Gegner kam (wichtig für die Reflektion)
-        // Hinweis: Du musst sicherstellen, dass vor diesem Zug 'totalDamage' des Gegners 
-        // global oder im Dataset gespeichert wurde.
-        showCounterUI(attacker, target); 
-        return; 
-    }
     
     // 2. Transformation prüfen
     if (currentAtkName === "Wandler") {
@@ -3529,6 +3512,19 @@ function closeCounter() {
     let rollMod = (roll === 1) ? -10 : (roll === 5) ? 10 : (roll === 6) ? 20 : 0; 
     let totalDamage = isImmune ? 0 : Math.max(0, Math.round(modifiedBase) + rollMod + totalCritBonus);
 
+    // 4b. Gegner hat Konter/Spiegelcape bereit: Schaden wird abgewehrt, bei perfektem Chip kommt die Hälfte zurück
+    let counterResult = null, reflectedDamage = 0;
+    if (target.dataset.counter && chosenAtk && chosenAtk.d !== 0) {
+        counterResult = target.dataset.counter;
+        target.removeAttribute('data-counter');
+        if (counterResult === 'hit' && totalDamage > 0) {
+            reflectedDamage = Math.floor(totalDamage / 2);
+            const aHp = attacker.querySelector('.hp-box');
+            aHp.innerText = Math.max(0, parseInt(aHp.innerText) - reflectedDamage);
+        }
+        totalDamage = 0;
+    }
+
     // 5. Gift-Logik
     let isPoisonAttack = false;
     let poisonValue = 10; 
@@ -3543,7 +3539,7 @@ function closeCounter() {
     }
 }
 
-if (isPoisonAttack && !isImmune) {
+if (isPoisonAttack && !isImmune && !counterResult) {
     const poisonChance = chosenAtk.poisonChance ?? 100;
     const poisonRoll = Math.random() * 100;
 
@@ -3577,7 +3573,9 @@ if (isPoisonAttack && !isImmune) {
     document.getElementById('diceModal').style.display = 'none'; 
 
     // Treffer-Meldung (Aussehen oben im Abschnitt "TREFFER-MELDUNG GESTALTEN")
-    if (!(chosenAtk && chosenAtk.effect === "heal" && chosenAtk.d === 0)) {
+    if (counterResult) {
+        showHitPopup(counterResult === 'hit' ? "KONTER!" : "ABGEWEHRT!", counterResult === 'hit' ? targetName + " wehrt ab, " + attackerName + " bekommt " + reflectedDamage + " Schaden" : targetName + " wehrt die Attacke ab", "");
+    } else if (!(chosenAtk && chosenAtk.effect === "heal" && chosenAtk.d === 0)) {
         let subText = "";
         if (isImmune) subText = "Hat keine Wirkung!";
         else if (effectivenessValue > 0) subText = "Sehr effektiv!";
