@@ -377,6 +377,9 @@
             <div class="setup-vs">VS</div>
             <div class="setup-side side-p2">
                 <div class="side-label">Gegner</div>
+                <input id="trainerCardSearch" class="wild-search" type="text" placeholder="🔍 Trainer-Karte suchen..." oninput="renderTrainerCardResults()" autocomplete="off" style="margin-bottom:8px;">
+                <div id="trainerCardResults" class="wild-results" style="grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); margin-bottom:8px;"></div>
+                <div id="trainerCardSelected"></div>
                 <div id="p2Choices" class="side-choices"></div>
             </div>
         </div>
@@ -485,6 +488,7 @@
     <span id="volPct">100%</span>
 </div>
 
+<script src="trainer-karten.js"></script>
 <script> 
     // Übersichtsmusik: 3 aneinandergereihte Teile (ca. je 25 Min.). Teil und Sekunde werden am Gerät gemerkt,
     // damit die Musik nach einem Kampf oder Neuladen dort weiterläuft, wo sie war.
@@ -710,7 +714,7 @@ document.addEventListener('click', () => {
     // Alle Attacken eines Pokémon: Datenbank (oder Wandler-Kopie), minus ersetzte, plus per TM gelernte
     function getAtkList(card) {
         const name = card.querySelector('input').value;
-        const base = card.dataset.isTransformed === "true" ? JSON.parse(card.dataset.transformedAtks) : (pokemonDB[name] ? pokemonDB[name].atks : []);
+        const base = card.dataset.isTransformed === "true" ? JSON.parse(card.dataset.transformedAtks) : card.dataset.cardAtks ? JSON.parse(card.dataset.cardAtks) : (pokemonDB[name] ? pokemonDB[name].atks : []);
         let learned = [];
         try { learned = JSON.parse(card.dataset.tm || '[]'); } catch (e) {}
         let forgot = [];
@@ -3063,6 +3067,8 @@ let players = [], poolP1 = [], poolP2 = [], activeP1 = null, activeP2 = null, ba
 
     function openBattleSetup() { 
         poolP1 = []; poolP2 = [];
+        trainerCardPick = null;
+        document.getElementById('trainerCardSearch').value = "";
         battleType = "trainer";
         playMusic('choose');
         document.getElementById('wildSetupView').style.display='none';
@@ -3075,8 +3081,47 @@ let players = [], poolP1 = [], poolP2 = [], activeP1 = null, activeP2 = null, ba
         renderArenaSetup();
     } 
 
+    // Trainer-Karten (Ereigniskarten): Suche, Auswahl und Gegner-Pokémon aus den Kartenwerten
+    let trainerCardPick = null;
+    function renderTrainerCardResults() {
+        const q = document.getElementById('trainerCardSearch').value.trim().toLowerCase();
+        const cont = document.getElementById('trainerCardResults'); cont.innerHTML = "";
+        trainerCards.filter(c => !q || [c.titel, c.name, c.pokemon, c.belohnung, "kat " + c.kat].some(t => t.toLowerCase().includes(q))).slice(0, 12).forEach(c => {
+            const item = document.createElement('div');
+            item.className = 'wild-result' + (trainerCardPick === c ? ' selected' : '');
+            item.innerHTML = `<img src="${pokemonDB[c.pokemon]?.icon || ''}"><b>${c.titel} ${c.name}</b><br><span style="font-weight:normal; opacity:.8;">${c.pokemon} S${c.stufe} | ${c.hp} KP</span>`;
+            item.onclick = () => { trainerCardPick = (trainerCardPick === c ? null : c); renderTrainerCardResults(); renderArenaSetup(); };
+            cont.appendChild(item);
+        });
+    }
+
+    // Gegner-Pokémon aus einer Trainer-Karte als unsichtbare Karte anlegen (gehört keinem Spieler, wird nicht gespeichert, steigt nicht auf)
+    function makeTrainerCardMon(c) {
+        const holder = document.getElementById('wildHolder');
+        holder.querySelector('.pkmn-list').innerHTML = "";
+        addPkmn('wildHolder');
+        const mon = holder.querySelector('.pkmn-card');
+        const d = pokemonDB[c.pokemon];
+        mon.querySelector('input').value = c.pokemon;
+        mon.querySelector('.pkmn-icon-small').src = d.icon;
+        mon.dataset.kat = c.kat;
+        mon.dataset.stage = c.stufe;
+        mon.querySelector('.stage-tag').innerText = "S" + c.stufe;
+        mon.dataset.maxhp = c.hp;
+        mon.querySelector('.hp-box').innerText = c.hp;
+        mon.dataset.wild = "true";
+        mon.dataset.trainerName = c.titel === c.name ? c.name : (c.titel + " " + c.name);
+        mon.dataset.cardAtks = JSON.stringify(c.atks.map(a => ({ n: a.n, d: a.d, s: 1, t: a.t, die: a.die })));
+        return mon;
+    }
+
     // Baut die Arena-Auswahl (Modus, Herausforderer, Gegner) aus den versteckten Auswahlfeldern
     function renderArenaSetup() {
+        renderTrainerCardResults();
+        document.getElementById('trainerCardSelected').innerHTML = trainerCardPick
+            ? `<div class="player-choice selected" onclick="trainerCardPick = null; renderArenaSetup();"><span class="pc-name">${trainerCardPick.titel} ${trainerCardPick.name}</span><span class="pc-team"><img src="${pokemonDB[trainerCardPick.pokemon]?.icon || ''}"> ${trainerCardPick.pokemon} S${trainerCardPick.stufe} | ${trainerCardPick.hp} KP &times;</span></div>`
+            : "";
+        document.getElementById('p2Choices').style.display = trainerCardPick ? 'none' : '';
         const modeSel = document.getElementById('modeSel');
         const pills = document.getElementById('modePills'); pills.innerHTML = "";
         Array.from(modeSel.options).forEach(o => {
@@ -3105,6 +3150,14 @@ let players = [], poolP1 = [], poolP2 = [], activeP1 = null, activeP2 = null, ba
 
     function goToPkmnSelection() { 
         battleMode = parseInt(document.getElementById('modeSel').value); fillSelection('p1PkmnSelect', document.getElementById('p1Sel').value, poolP1); fillSelection('p2PkmnSelect', document.getElementById('p2Sel').value, poolP2); 
+        if (trainerCardPick) {
+            const mon = makeTrainerCardMon(trainerCardPick);
+            poolP2 = [mon];
+            document.getElementById('p2SelName').innerText = mon.dataset.trainerName;
+            document.getElementById('p2PickCount').innerText = "";
+            document.getElementById('p2PkmnSelect').innerHTML = `<div class="pick-card selected"><img src="${mon.querySelector('.pkmn-icon-small').src}"><div class="pick-name"><span class="stage-tag">S${mon.dataset.stage}</span> ${mon.querySelector('input').value}</div><div class="pick-hp"><div style="width:100%; background:#2ecc71;"></div></div><div class="pick-hp-text">${mon.dataset.maxhp} / ${mon.dataset.maxhp}</div></div>`;
+        }
+
         document.getElementById('setupView').style.display='none'; document.getElementById('pkmnSelectView').style.display='block'; 
     } 
 
@@ -3134,7 +3187,7 @@ let players = [], poolP1 = [], poolP2 = [], activeP1 = null, activeP2 = null, ba
 
     function startFight() { 
         const p1TeamSize = document.getElementById(document.getElementById('p1Sel').value).querySelectorAll('.pkmn-card').length;
-        const p2TeamSize = document.getElementById(document.getElementById('p2Sel').value).querySelectorAll('.pkmn-card').length;
+        const p2TeamSize = trainerCardPick ? 1 : document.getElementById(document.getElementById('p2Sel').value).querySelectorAll('.pkmn-card').length;
         const p1Required = Math.min(battleMode, p1TeamSize);
         const p2Required = Math.min(battleMode, p2TeamSize);
 
@@ -3269,7 +3322,7 @@ let players = [], poolP1 = [], poolP2 = [], activeP1 = null, activeP2 = null, ba
         // Ruf abspielen, wenn ein Pokémon neu in den Kampf kommt
         if (activeP1 !== lastCryP1) { lastCryP1 = activeP1; playCry(activeP1); }
         if (activeP2 !== lastCryP2) { lastCryP2 = activeP2; const p2 = activeP2; setTimeout(() => playCry(p2), 900); }
-        const pName = attackerSide === 1 ? "SPIELER 1" : (battleType === "wild" ? "WILDES " + activeP2.querySelector('input').value.toUpperCase() : "SPIELER 2");
+        const pName = attackerSide === 1 ? "SPIELER 1" : (battleType === "wild" ? "WILDES " + activeP2.querySelector('input').value.toUpperCase() : activeP2.dataset.trainerName ? activeP2.dataset.trainerName.toUpperCase() : "SPIELER 2");
         document.getElementById('turnIndicator').innerText = `RUNDE ${currentRound} - ${pName} AM ZUG`;
         renderSlot(1, activeP1, attackerSide === 1); 
         renderSlot(2, activeP2, attackerSide === 2); 
@@ -3933,7 +3986,7 @@ function getWinsNeeded(pokemonName, stage) {
             // Außenseiter-Sieg: höhere Kat. besiegt und mindestens die Hälfte der KP selbst abgezogen
             let winGain = 1;
             const ownKat = pokemonDB[curName]?.kat || 1;
-            const oppKat = pokemonDB[opp.querySelector('input').value]?.kat || 1;
+            const oppKat = parseInt(opp.dataset.kat) || pokemonDB[opp.querySelector('input').value]?.kat || 1;
             let dealtBy = {}; try { dealtBy = JSON.parse(opp.dataset.dmgBy || '{}'); } catch (e) {}
             if (oppKat > ownKat && (dealtBy[cardUid(pkmn)] || 0) >= (parseInt(opp.dataset.maxhp) || 0) / 2) {
                 winGain = 2;
@@ -4178,26 +4231,30 @@ function showEvolutionChoice(choices, pkmn) {
         const p1L = poolP1.every(p => parseInt(p.querySelector('.hp-box').innerText) <= 0); 
         const p2L = poolP2.every(p => parseInt(p.querySelector('.hp-box').innerText) <= 0); 
         if(p1L || p2L) { 
+            const card = trainerCardPick;
             setTimeout(() => {
-                let winnerName;
-                if (battleType === "wild") {
+                let winnerName, extra = "";
+                if (card) {
+                    winnerName = p1L ? card.titel + " " + card.name : document.getElementById('p1Sel').options[document.getElementById('p1Sel').selectedIndex]?.text || "Spieler 1";
+                    if (!p1L) extra = "Belohnung: " + card.belohnung;
+                } else if (battleType === "wild") {
                     winnerName = p1L ? "Wildes " + poolP2[0].querySelector('input').value : document.getElementById(wildPlayerId).querySelector('input').value;
                 } else {
                     const winnerSel = document.getElementById(p1L ? 'p2Sel' : 'p1Sel');
                     winnerName = winnerSel.options[winnerSel.selectedIndex]?.text || (p1L ? "Spieler 2" : "Spieler 1");
                 }
                 playMusic('victory');
-                showVictory(winnerName, p1L ? 2 : 1);
+                showVictory(winnerName, p1L ? 2 : 1, extra);
             }, Math.max(500, lastLevelUpAt + 2800 - Date.now())); // Level-up-Sound ausklingen lassen
         } 
     }
 
     // Sieger-Anzeige mit Siegesmusik
-    function showVictory(name, side) {
+    function showVictory(name, side, extra = "") {
         const color = side === 1 ? '#3498db' : '#e74c3c';
         const overlay = document.createElement('div');
         overlay.id = 'victoryOverlay';
-        overlay.innerHTML = `<div class="victory-box" style="--side:${color}"><div class="victory-cup">🏆</div><div class="dice-sub">Sieger</div><div class="victory-name">${name}</div><button class="setup-next" onclick="document.getElementById('victoryOverlay').remove(); closeBattle();">Zurück zur Übersicht</button></div>`;
+        overlay.innerHTML = `<div class="victory-box" style="--side:${color}"><div class="victory-cup">🏆</div><div class="dice-sub">Sieger</div><div class="victory-name">${name}</div>${extra ? `<div class="dice-sub" style="margin:8px 0 14px; font-size:15px; letter-spacing:0.5px;">${extra}</div>` : ''}<button class="setup-next" onclick="document.getElementById('victoryOverlay').remove(); closeBattle();">Zurück zur Übersicht</button></div>`;
         document.body.appendChild(overlay);
     }
 
@@ -4214,6 +4271,7 @@ function showEvolutionChoice(choices, pkmn) {
 function closeBattle() { 
         document.getElementById('battleOverlay').style.display = 'none'; 
         decisionRound = false;
+        trainerCardPick = null;
         document.querySelectorAll('.pkmn-card').forEach(c => c.removeAttribute('data-ap-used'));
         playMusic('arena');
         
