@@ -1879,7 +1879,6 @@ document.addEventListener('click', () => {
         icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/133.png",
         kat: 1,
         hp: [140, 160, 180],
-        levelWins: [2, 3, 3],
         types: ["Normal"],
         atks: [
             { n: "Tackle", d: 40, s: 1, t: "Normal" },
@@ -3554,14 +3553,15 @@ if (isPoisonAttack && !isImmune) {
 function getWinsNeeded(pokemonName, stage) {
     const current = pokemonDB[pokemonName];
 
-    // Manueller Sonderwert hat Vorrang, z.B. Evoli
+    // Manueller Sonderwert hat Vorrang: levelWins: [S1→S2, S2→S3, Entwicklung] im Pokémon-Eintrag
     if (current?.levelWins) {
         return current.levelWins[stage - 1];
     }
 
-    // S1 -> S2 und S2 -> S3 immer 2 Siege
+    // S1 -> S2 und S2 -> S3: je nach Kategorie des Pokémon [Siege für S1→S2, Siege für S2→S3]
+    const STUFEN_SIEGE = { 1: [1, 1], 2: [1, 2], 3: [2, 2] };
     if (stage < 3) {
-        return 2;
+        return STUFEN_SIEGE[current?.kat || 1]?.[stage - 1] ?? 2;
     }
 
     // Ab hier S3 -> Entwicklung
