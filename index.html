@@ -1879,7 +1879,6 @@ document.addEventListener('click', () => {
         icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/133.png",
         kat: 1,
         hp: [140, 160, 180],
-        levelWins: [1, 2, 6], // gleich viele Siege (9) wie eine Dreier-Entwicklung bis zur Kat-3-Form
         types: ["Normal"],
         atks: [
             { n: "Tackle", d: 40, s: 1, t: "Normal" },
@@ -3559,41 +3558,21 @@ function getWinsNeeded(pokemonName, stage) {
         return current.levelWins[stage - 1];
     }
 
-    // S1 -> S2 und S2 -> S3: je nach Kategorie des Pokémon [Siege für S1→S2, Siege für S2→S3]
-    const STUFEN_SIEGE = { 1: [1, 1], 2: [1, 2], 3: [2, 2] };
-    if (stage < 3) {
-        return STUFEN_SIEGE[current?.kat || 1]?.[stage - 1] ?? 2;
-    }
-
-    // Ab hier S3 -> Entwicklung
+    // Kategorie-Sprung zur Entwicklung (bei mehreren Entwicklungen zählt die höchste Kategorie)
+    const ownKat = current?.kat || 1;
     const next = evolutions[pokemonName];
+    const nextNames = next ? (Array.isArray(next) ? next : [next]) : [];
+    const nextKats = nextNames.map(name => pokemonDB[name]?.kat).filter(kat => kat != null);
+    const categoryJump = nextKats.length ? Math.max(...nextKats) - ownKat : 0;
 
-    // Keine Entwicklung
-    if (!next) {
-        return 2;
-    }
+    // Siege [S1→S2, S2→S3, Entwicklung nach S3]
+    let wins;
+    if (categoryJump >= 2) wins = [1, 2, 4];      // überspringt eine Kategorie, z. B. Evoli, Karpador: 7 Siege
+    else if (ownKat === 1) wins = [1, 1, 2];      // Kat 1 → 2: 4 Siege
+    else if (ownKat === 2) wins = [1, 2, 2];      // Kat 2 → 3: 5 Siege
+    else wins = [2, 3, 2];                        // Kat 3 und 4: 2 + 3 Siege bis S3
 
-    // Mehrere Entwicklungen möglich
-    const nextNames = Array.isArray(next) ? next : [next];
-
-    const nextCategories = nextNames
-        .map(name => pokemonDB[name]?.kat)
-        .filter(kat => kat != null);
-
-    if (nextCategories.length === 0) {
-        return 2;
-    }
-
-    const currentKat = current?.kat || 1;
-    const highestNextKat = Math.max(...nextCategories);
-    const categoryJump = highestNextKat - currentKat;
-
-    // Kategorie-Regel
-    if (categoryJump <= 1) return 2;
-    if (categoryJump === 2) return 4;
-    if (categoryJump >= 3) return 6;
-
-    return 2;
+    return wins[stage - 1] ?? 2;
 }
   function checkEvolutionAfterRound() {
     [activeP1, activeP2].forEach((pkmn, idx) => {
