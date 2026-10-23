@@ -3770,18 +3770,25 @@ function showEvolutionAnimation(oldName, oldIcon, newName, newIcon, pkmn) {
     const overlay = document.createElement('div');
     overlay.id = 'evoOverlay';
     overlay.innerHTML = `<div class="evo-stage"><div class="evo-glow"></div><img class="evo-sprite" src="${oldIcon}"></div>
-        <div class="evo-text">Nanu? <b>${oldName}</b> entwickelt sich!</div>
+        <div class="evo-text"><b>${oldName}</b> hat genug Erfahrung gesammelt!</div>
         <button class="setup-next evo-btn" style="visibility:hidden;">Weiter</button>`;
     document.body.appendChild(overlay);
     const img = overlay.querySelector('.evo-sprite');
     const text = overlay.querySelector('.evo-text');
     const btn = overlay.querySelector('.evo-btn');
-    playCry({ querySelector: () => ({ src: oldIcon }) });
+
+    // Erst der Level-up-Sound, dann eine kurze Pause, dann beginnt die Entwicklung
+    playSound('level-up.mp3');
+    lastLevelUpAt = Date.now();
+    const LEVELUP_PAUSE_MS = 4200; // Level-up-Sound (ca. 2,7 s) + ca. 1,5 s Pause
 
     // Entwicklungsmusik nur während der Animation
     const evoMusic = new Audio('sounds/entwicklung.mp3');
     evoMusic.volume = vol(0.8);
-    if (soundOn) { applyGain(evoMusic); evoMusic.play().catch(() => {}); }
+    setTimeout(() => {
+        text.innerHTML = `Nanu? <b>${oldName}</b> entwickelt sich!`;
+        playCry({ querySelector: () => ({ src: oldIcon }) });
+        if (soundOn) { applyGain(evoMusic); evoMusic.play().catch(() => {}); }
 
     // Phase 1: kurz das alte Pokémon zeigen, dann ca. 16 Sekunden lang zwischen alt und neu wechseln
     // (als weiße Silhouette), erst langsam, dann immer schneller
@@ -3800,6 +3807,7 @@ function showEvolutionAnimation(oldName, oldIcon, newName, newIcon, pkmn) {
         };
         setTimeout(flip, 1100);
     }, 2500);
+    }, LEVELUP_PAUSE_MS);
 
     // Phase 2: weißer Blitz, das neue Pokémon erscheint
     function reveal() {
