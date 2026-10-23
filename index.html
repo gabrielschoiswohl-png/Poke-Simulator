@@ -151,6 +151,7 @@
         #diceModal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #333; border: 2px solid var(--win); border-radius: 15px; padding: 20px; z-index: 4000; display: none; width: 85%; max-width: 320px; text-align: center; } 
         .dice-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 15px; } 
         .dice-btn { background: #555; border: 1px solid #888; color: white; padding: 12px 5px; border-radius: 8px; font-weight: bold; cursor: pointer; } 
+        .atk-btn:disabled { opacity: 0.4; filter: grayscale(1); cursor: not-allowed; }
         .atk-btn { background: #444; border: 1px solid #666; color: white; border-radius: 4px; padding: 5px; font-size: 11px; cursor: pointer; height: 50px; } 
         .atk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 8px; } 
         
@@ -729,6 +730,17 @@ document.addEventListener('click', () => {
         return order.map(k => best[k]);
     }
     const MAX_ATKS = 4;
+
+    // Einsätze (AP) von Heil-Attacken: pro Kampf begrenzt, erst nach dem Kampf wieder voll (Standard 2, pro Attacke mit ap: N änderbar)
+    const DEFAULT_HEAL_AP = 2;
+    function atkMaxAp(a) { return a.effect === 'heal' ? (a.ap ?? DEFAULT_HEAL_AP) : null; }
+    function atkApLeft(card, a) {
+        const max = atkMaxAp(a);
+        if (max === null) return null;
+        let used = {}; try { used = JSON.parse(card.dataset.apUsed || '{}'); } catch (e) {}
+        return Math.max(0, max - (used[a.n.trim()] || 0));
+    }
+    function resetAp(cards) { cards.forEach(c => c && c.removeAttribute && c.removeAttribute('data-ap-used')); }
 
     // Mehr als 4 Attacken (z. B. nach Stufenaufstieg): das Pokémon muss eine vergessen
     function enforceAttackLimit(cards) {
@@ -3133,6 +3145,7 @@ let players = [], poolP1 = [], poolP2 = [], activeP1 = null, activeP2 = null, ba
         lastCryP1 = lastCryP2 = null;
         playBattleMusic();
         decisionRound = false;
+        resetAp(poolP1.concat(poolP2));
         activeP1 = poolP1[0]; activeP2 = poolP2[0]; attackerSide = 1; currentRound = 1;
         setTimeout(() => enforceAttackLimit(poolP1.concat(poolP2)), 300);
         document.getElementById('turnIndicator').style.display = 'block';
@@ -3244,6 +3257,7 @@ let players = [], poolP1 = [], poolP2 = [], activeP1 = null, activeP2 = null, ba
         playBattleMusic(true);
         activeP1 = poolP1[0]; activeP2 = wild; attackerSide = 1; currentRound = 1;
         setTimeout(() => enforceAttackLimit(poolP1), 300);
+        resetAp(poolP1.concat([wild]));
         document.getElementById('turnIndicator').style.display = 'block';
         document.getElementById('wildSetupView').style.display = 'none';
         document.getElementById('fightView').style.display = 'block';
@@ -3320,7 +3334,8 @@ function renderSlot(side, pkmn, isAttacker) {
                 if (a.n === "Wandler") {
                     atks += `<button class="atk-btn" onclick="triggerAtk(0, 'Normal', event, 1, 'Wandler')">Wandler</button>`;
                 } else {
-                    atks += `<button class="atk-btn" style="--type:${typeColors[a.t] || '#888'}" onclick="triggerAtk(${a.d}, '${a.t}', event, ${a.m || 1}, '${a.n}')"><span class="atk-type">${a.t}</span><span class="atk-name">${a.n.replace(/\s*\((?:\d+x|-\d+|\+\d+ Crit)\)\s*$/, '')}${a.m > 1 ? `<span class="atk-multi"> (${a.m}x)</span>` : ''}${(a.n.match(/\(-(\d+)\)/) && a.effect === 'poison') ? `<span class="atk-multi"> (-${a.n.match(/\(-(\d+)\)/)[1]})</span>` : ''}${a.n.match(/\(\+\d+ Crit\)/) ? `<span class="atk-multi"> ${a.n.match(/\(\+\d+ Crit\)/)[0]}</span>` : ''}</span><b class="atk-dmg">${a.d}</b></button>`;
+                    const apLeft = atkApLeft(pkmn, a);
+                    atks += `<button class="atk-btn" ${apLeft === 0 ? 'disabled' : ''} style="--type:${typeColors[a.t] || '#888'}" onclick="triggerAtk(${a.d}, '${a.t}', event, ${a.m || 1}, '${a.n}')"><span class="atk-type">${a.t}</span><span class="atk-name">${a.n.replace(/\s*\((?:\d+x|-\d+|\+\d+ Crit)\)\s*$/, '')}${a.m > 1 ? `<span class="atk-multi"> (${a.m}x)</span>` : ''}${(a.n.match(/\(-(\d+)\)/) && a.effect === 'poison') ? `<span class="atk-multi"> (-${a.n.match(/\(-(\d+)\)/)[1]})</span>` : ''}${a.n.match(/\(\+\d+ Crit\)/) ? `<span class="atk-multi"> ${a.n.match(/\(\+\d+ Crit\)/)[0]}</span>` : ''}${apLeft !== null ? `<span class="atk-multi"> (${apLeft}/${atkMaxAp(a)})</span>` : ''}</span><b class="atk-dmg">${a.d}</b></button>`;
                 }
             });
         }
@@ -3548,6 +3563,11 @@ function openItemMenu(side) {
 
         const atkName = atkCard ? atkCard.querySelector('input').value : '';
         const atkDef = atkCard ? getAtkList(atkCard).find(a => a.n === name) : null;
+        if (atkDef && atkMaxAp(atkDef) !== null) {
+            let used = {}; try { used = JSON.parse(atkCard.dataset.apUsed || '{}'); } catch (e) {}
+            used[name.trim()] = (used[name.trim()] || 0) + 1;
+            atkCard.dataset.apUsed = JSON.stringify(used);
+        }
         const isCounter = !!(atkDef && atkDef.effect === 'counter') || (atkCard && atkCard.dataset.isTransformed === "true" && name !== '' && (JSON.parse(atkCard.dataset.transformedAtks || '[]').find(a => a.n === name) || {}).effect === 'counter');
         if (isCounter) {
             const foe = attackerSide === 1 ? activeP2 : activeP1;
@@ -4194,6 +4214,7 @@ function showEvolutionChoice(choices, pkmn) {
 function closeBattle() { 
         document.getElementById('battleOverlay').style.display = 'none'; 
         decisionRound = false;
+        document.querySelectorAll('.pkmn-card').forEach(c => c.removeAttribute('data-ap-used'));
         playMusic('arena');
         
         // Alle Gift-Status-Flags entfernen
