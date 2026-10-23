@@ -145,7 +145,7 @@
         .switch-card.fainted { filter: grayscale(1); opacity: 0.45; cursor: default; }
         .item-grid .btn-action { background: linear-gradient(135deg, color-mix(in srgb, var(--c, #888) 35%, #1a1a1a), #1a1a1a 80%); border: 1px solid color-mix(in srgb, var(--c, #888) 70%, transparent); border-radius: 12px; font-size: 14px; gap: 6px; }
         .item-grid .btn-action img { width: 34px; height: 34px; margin: 0; image-rendering: pixelated; }
-        .item-grid .potion { --c: #6c5ce7; } .item-grid .super { --c: #fd9644; } .item-grid .hyper { --c: #ff78ae; } .item-grid .revive { --c: #d4ac0d; } .item-grid .max-revive { --c: #c0392b; } .item-grid .antidote { --c: #9b59b6; } .item-grid .wake { --c: #3498db; } .item-grid .herb { --c: #2ecc71; }
+        .item-grid .potion { --c: #6c5ce7; } .item-grid .super { --c: #fd9644; } .item-grid .hyper { --c: #ff78ae; } .item-grid .revive { --c: #d4ac0d; } .item-grid .max-revive { --c: #c0392b; } .item-grid .antidote { --c: #9b59b6; } .item-grid .wake { --c: #3498db; } .item-grid .herb { --c: #2ecc71; } .item-grid .tm { --c: #7f8c8d; }
         
         #diceModal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #333; border: 2px solid var(--win); border-radius: 15px; padding: 20px; z-index: 4000; display: none; width: 85%; max-width: 320px; text-align: center; } 
         .dice-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 15px; } 
@@ -662,6 +662,7 @@ document.addEventListener('click', () => {
     const imgTopBeleber = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/max-revive.png";
     const imgGegengift = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/antidote.png";
     const imgAufwecker = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/awakening.png";
+    const imgTM = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/tm-normal.png";
     const imgMentalkraut = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/mental-herb.png";
 
     // Alle Items an einer Stelle: Name, Bild, Art und Wirkung
@@ -673,8 +674,36 @@ document.addEventListener('click', () => {
         { cls: 'max-revive', label: 'Top-Bel. (MAX)',  img: imgTopBeleber,  type: 'revive',  amount: 9999 },
         { cls: 'antidote',   label: 'Gegengift',       img: imgGegengift,   type: 'antidote', amount: 0 },
         { cls: 'wake',       label: 'Aufwecker',       img: imgAufwecker,   type: 'wake',    amount: 0 },
-        { cls: 'herb',       label: 'Mentalkraut',     img: imgMentalkraut, type: 'unconfuse', amount: 0 }
+        { cls: 'herb',       label: 'Mentalkraut',     img: imgMentalkraut, type: 'unconfuse', amount: 0 },
+        { cls: 'tm',         label: 'TM',              img: imgTM,          type: 'tm',      amount: 0 }
     ];
+    // TMs: Mindest-Kategorie und erlaubte Typen stehen auf der Karte (types: null = jeder Typ)
+    const TM_DEFS = [
+        { id: 'TM01', kat: 1, types: null,                          atk: { n: "Powerpunch", d: 80,  s: 1, t: "Kampf", die: "D12" }, img: "tm-fighting" },
+        { id: 'TM03', kat: 1, types: ["Wasser", "Eis"],             atk: { n: "Aquawelle",  d: 90,  s: 1, t: "Wasser", die: "D12" }, img: "tm-water" },
+        { id: 'TM14', kat: 3, types: ["Eis", "Wasser", "Drache"],   atk: { n: "Blizzard",   d: 120, s: 1, t: "Eis", die: "D12" }, img: "tm-ice" }
+    ];
+    const tmImg = tm => "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/" + tm.img + ".png";
+
+    // Alle Attacken eines Pokémon: Datenbank (oder Wandler-Kopie), minus ersetzte, plus per TM gelernte
+    function getAtkList(card) {
+        const name = card.querySelector('input').value;
+        const base = card.dataset.isTransformed === "true" ? JSON.parse(card.dataset.transformedAtks) : (pokemonDB[name] ? pokemonDB[name].atks : []);
+        let learned = [];
+        try { learned = JSON.parse(card.dataset.tm || '[]'); } catch (e) {}
+        const replaced = learned.map(l => l.replaces);
+        return base.filter(a => !replaced.includes(a.n)).concat(learned.map(l => l.atk));
+    }
+
+    // Warum ein Pokémon die TM nicht lernen kann (null = geht)
+    function tmBlockReason(card, tm) {
+        const db = pokemonDB[card.querySelector('input').value];
+        if (!db) return "Unbekanntes Pokémon";
+        if ((db.kat || 1) < tm.kat) return "Braucht mindestens Kat. " + tm.kat;
+        if (tm.types && !db.types.some(t => tm.types.includes(t))) return "Nur für " + tm.types.join(", ") + " Pokémon";
+        if (getAtkList(card).some(a => a.n === tm.atk.n)) return "Kennt " + tm.atk.n + " schon";
+        return null;
+    }
     const pkBallSprite = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png"; 
 
     // Farben der Typen (für die Attacken-Knöpfe in der Arena)
@@ -3213,7 +3242,7 @@ function renderSlot(side, pkmn, isAttacker) {
         
         // Prüfen ob Ditto transformiert ist
         const isTransformed = pkmn.dataset.isTransformed === "true";
-        const atkSource = isTransformed ? JSON.parse(pkmn.dataset.transformedAtks) : (pokemonDB[name] ? pokemonDB[name].atks : []);
+        const atkSource = getAtkList(pkmn);
 
         if (atkSource) {
             // Gleiche Attacke mehrmals (z. B. stärkeres Donnerblitz ab S3): nur die höchste freigeschaltete Version zeigen, am Platz der alten
@@ -3257,7 +3286,7 @@ function renderSlot(side, pkmn, isAttacker) {
 function openItemMenu(side) {
         const menu = document.getElementById('itemMenu'), grid = document.getElementById('itemGrid');
         menu.style.display = 'flex';
-        grid.innerHTML = ITEM_DEFS.map(d => `<button class="btn-action ${d.cls}" style="min-height:80px;" onclick="applyBattleItem(${side}, '${d.type}', ${d.amount})"><img src="${d.img}">${d.label}</button>`).join('');
+        grid.innerHTML = ITEM_DEFS.filter(d => d.type !== 'tm').map(d => `<button class="btn-action ${d.cls}" style="min-height:80px;" onclick="applyBattleItem(${side}, '${d.type}', ${d.amount})"><img src="${d.img}">${d.label}</button>`).join('');
     }
 
     // Warum ein Item bei diesem Pokémon nicht geht (null = geht)
@@ -3340,6 +3369,7 @@ function openItemMenu(side) {
             return;
         }
         const def = ITEM_DEFS[index];
+        if (def.type === 'tm') return showTmList();
         title.innerHTML = `<img src="${def.img}" alt="">${def.label}: wem geben?`;
         title.style.color = 'white';
         back.style.display = 'block';
@@ -3364,10 +3394,71 @@ function openItemMenu(side) {
         body.appendChild(grid);
     }
 
+    // TM-Ablauf in der Übersicht: TM wählen, Pokémon wählen, zu ersetzende Attacke wählen
+    function tmCardHtml(tm) {
+        const need = `Kat. ${tm.kat}+` + (tm.types ? ' | ' + tm.types.join(', ') : ' | alle Typen');
+        return `<div class="sw-sprite"><img src="${tmImg(tm)}"></div><div class="sw-info"><div class="fs-name-row"><span class="stage-tag">${tm.id}</span><b class="sw-name">${tm.atk.n}</b></div><div class="fs-hp-text"><span style="color:${typeColors[tm.atk.t] || '#888'}">${tm.atk.t}</span> | <b>${tm.atk.d}</b> Schaden | ${tm.atk.die}</div><div class="fs-hp-text" style="font-size:11px; opacity:.8;">${need}</div></div>`;
+    }
+    function tmSetStep(titleHtml, showBack) {
+        const title = document.getElementById('ovItemTitle');
+        title.innerHTML = titleHtml; title.style.color = 'white';
+        document.getElementById('ovItemBack').style.display = showBack ? 'block' : 'none';
+        const body = document.getElementById('ovItemBody'); body.innerHTML = '';
+        const grid = document.createElement('div'); grid.className = 'switch-grid'; body.appendChild(grid);
+        return grid;
+    }
+    function showTmList() {
+        const grid = tmSetStep(`<img src="${imgTM}" alt="">Welche TM?`, true);
+        TM_DEFS.forEach((tm, i) => {
+            const el = document.createElement('div');
+            el.className = 'switch-card'; el.style.setProperty('--side', typeColors[tm.atk.t] || '#888');
+            el.innerHTML = tmCardHtml(tm);
+            el.onclick = () => showTmPokemon(i);
+            grid.appendChild(el);
+        });
+    }
+    function showTmPokemon(i) {
+        const tm = TM_DEFS[i];
+        const grid = tmSetStep(`<img src="${tmImg(tm)}" alt="">${tm.id} ${tm.atk.n}: wem beibringen?`, true);
+        Array.from(document.getElementById(ovItemPlayer).querySelectorAll('.pkmn-card')).filter(c => pokemonDB[c.querySelector('input').value]).forEach(card => {
+            const reason = tmBlockReason(card, tm);
+            const el = document.createElement('div');
+            el.className = 'switch-card' + (reason ? ' disabled' : ''); el.style.setProperty('--side', '#3498db');
+            el.innerHTML = pokemonCardHtml(card) + (reason ? `<div class="fs-hp-text" style="font-size:11px; color:#e67e22;">${reason}</div>` : '');
+            el.onclick = () => reason ? showToast(reason) : showTmReplace(card, i);
+            grid.appendChild(el);
+        });
+    }
+    function showTmReplace(card, i) {
+        const tm = TM_DEFS[i], name = card.querySelector('input').value, stage = parseInt(card.dataset.stage) || 1;
+        const grid = tmSetStep(`<img src="${tmImg(tm)}" alt="">${name}: welche Attacke ersetzen?`, true);
+        // wie in der Arena: pro Attackenname nur die höchste freigeschaltete Version
+        const best = {};
+        getAtkList(card).filter(a => a.s <= stage).forEach(a => { if (!best[a.n] || a.s >= best[a.n].s) best[a.n] = a; });
+        Object.values(best).forEach(a => {
+            const el = document.createElement('div');
+            el.className = 'switch-card'; el.style.setProperty('--side', typeColors[a.t] || '#888');
+            el.innerHTML = `<div class="sw-info"><div class="fs-name-row"><b class="sw-name">${a.n.replace(/\s*\((?:\d+x|-\d+|\+\d+ Crit)\)\s*$/, '')}</b></div><div class="fs-hp-text"><span style="color:${typeColors[a.t] || '#888'}">${a.t}</span> | <b>${a.d}</b> Schaden</div></div>`;
+            el.onclick = () => {
+                let learned = []; try { learned = JSON.parse(card.dataset.tm || '[]'); } catch (e) {}
+                // eine früher per TM gelernte Attacke wird einfach überschrieben
+                const prev = learned.find(l => l.atk.n === a.n);
+                learned = learned.filter(l => l.atk.n !== a.n);
+                learned.push({ tm: tm.id, replaces: prev ? prev.replaces : a.n, atk: tm.atk });
+                card.dataset.tm = JSON.stringify(learned);
+                showToast(name + " hat " + tm.atk.n + " gelernt (statt " + a.n + ")!");
+                closeOverviewItems();
+                if (activeP1 || activeP2) updateArena();
+            };
+            grid.appendChild(el);
+        });
+    }
+
     function triggerAtk(dmg, type, e, maxHits = 1, name = "") { 
         e.stopPropagation(); 
         currentBaseDmg = dmg; currentAtkType = type; currentAtkName = name; multiHitMax = maxHits;
-        document.getElementById('diceTitle').innerText = name || 'Angriff';
+        const tmAtk = (attackerSide === 1 ? activeP1 : activeP2) ? getAtkList(attackerSide === 1 ? activeP1 : activeP2).find(a => a.n === name && a.die) : null;
+        document.getElementById('diceTitle').innerText = (name || 'Angriff') + (tmAtk ? ' (' + tmAtk.die + ')' : '');
         document.getElementById('diceModal').style.setProperty('--type', typeColors[type] || '#888');
         multiHitCount = 0; accumulatedHitsDmg = 0; totalCritBonus = 0;
         
@@ -3381,7 +3472,7 @@ function openItemMenu(side) {
         hint.style.display = (asleepNow || confusedNow) ? 'block' : 'none';
 
         const atkName = atkCard ? atkCard.querySelector('input').value : '';
-        const atkDef = pokemonDB[atkName]?.atks.find(a => a.n === name);
+        const atkDef = atkCard ? getAtkList(atkCard).find(a => a.n === name) : null;
         const isCounter = !!(atkDef && atkDef.effect === 'counter') || (atkCard && atkCard.dataset.isTransformed === "true" && name !== '' && (JSON.parse(atkCard.dataset.transformedAtks || '[]').find(a => a.n === name) || {}).effect === 'counter');
         if (isCounter) {
             const foe = attackerSide === 1 ? activeP2 : activeP1;
@@ -3482,7 +3573,8 @@ function dittoTransform(side) {
     
     // Bei gleichnamigen Attacken die höchste freigeschaltete Version nehmen (wie in der Arena angezeigt)
     const attackerStage = parseInt(attacker.dataset.stage) || 1;
-    let chosenAtk = (attackerData) ? attackerData.atks.filter(a => a.n === currentAtkName && a.s <= attackerStage).sort((x, y) => y.s - x.s)[0] || attackerData.atks.find(a => a.n === currentAtkName) : null;
+    const attackerAtks = getAtkList(attacker);
+    let chosenAtk = attackerAtks.filter(a => a.n === currentAtkName && a.s <= attackerStage).sort((x, y) => y.s - x.s)[0] || attackerAtks.find(a => a.n === currentAtkName) || null;
 
     
     // 2. Transformation prüfen
@@ -3994,6 +4086,7 @@ function closeBattle() {
                     wins: card.dataset.wins,
                     kat: card.dataset.kat,
                     poisoned: card.dataset.poisoned,
+                    tm: card.dataset.tm || "",
                     icon: card.querySelector('.pkmn-icon-small').src
                 }))
             }))
@@ -4020,6 +4113,7 @@ function closeBattle() {
                 card.dataset.wins = data.wins;
                 card.dataset.kat = data.kat;
                 card.dataset.poisoned = data.poisoned || "false";
+                if (data.tm) card.dataset.tm = data.tm;
                 card.querySelector('.pkmn-icon-small').src = data.icon;
                 card.querySelector('.stage-tag').innerText = "S" + data.stage;
                 const winsNeeded = getWinsNeeded(data.name, parseInt(data.stage)) || 2;
