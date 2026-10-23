@@ -514,6 +514,7 @@
             set volume(v) { a.volume = v; },
             get volume() { return a.volume; },
             pause() { a.pause(); save(); },
+            get paused() { return a.paused; },
             // Reset: wieder ganz vorne (Teil 1, Sekunde 0) anfangen
             restart() {
                 seekTo = 0; load(0); save();
@@ -619,11 +620,21 @@ document.addEventListener('click', e => {
 });
 
 // Spielt einen Sound aus dem Ordner "sounds" ab (z. B. playSound('cries/25.mp3'))
+// Kurze Jingles (Heilen, Level-up) pausieren die Hintergrundmusik und sie läuft danach weiter, wie im Gameboy-Spiel
+const JINGLES = ['heilen.mp3', 'level-up.mp3'];
 function playSound(file, volume = 1) {
     if (!soundOn) return;
     const a = new Audio('sounds/' + file);
     a.volume = vol(volume);
     applyGain(a);
+    if (JINGLES.includes(file) && currentTrack && !currentTrack.paused) {
+        const t = currentTrack;
+        t.pause();
+        const resume = () => { if (currentTrack === t && soundOn && t.paused) { applyGain(t); t.play().catch(() => {}); } };
+        a.addEventListener('ended', resume);
+        a.addEventListener('error', resume);
+        setTimeout(resume, 6000); // Sicherheitsnetz, falls das Ende-Ereignis ausbleibt
+    }
     a.play().catch(() => {});
 }
 
