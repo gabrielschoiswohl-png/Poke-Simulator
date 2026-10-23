@@ -3755,8 +3755,10 @@ function performEvolution(nextName, pkmn) {
     pkmn.dataset.kat = nd.kat;
     pkmn.dataset.stage = "1";
     pkmn.dataset.wins = "0";
+    // Fehlende KP bleiben erhalten (wie bei den Stufenaufstiegen), mindestens 1 KP
+    const missingHp = Math.max(0, (parseInt(pkmn.dataset.maxhp) || 0) - (parseInt(pkmn.querySelector('.hp-box').innerText) || 0));
     pkmn.dataset.maxhp = nd.hp[0];
-    pkmn.querySelector('.hp-box').innerText = nd.hp[0];
+    pkmn.querySelector('.hp-box').innerText = Math.max(1, nd.hp[0] - missingHp);
     pkmn.querySelector('.stage-tag').innerText = "S1";
     pkmn.querySelector('.win-fill').style.width = "0%";
     showEvolutionAnimation(oldName, oldIcon, nextName, nd.icon, pkmn);
