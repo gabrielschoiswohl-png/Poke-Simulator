@@ -2878,9 +2878,9 @@ let players = [], poolP1 = [], poolP2 = [], activeP1 = null, activeP2 = null, ba
         popup.hideTimer = setTimeout(() => { popup.className = ""; }, duration * 1000);
     }
 
-    function showToast(msg) {
+    function showToast(msg, ms = 2000) {
         const toast = document.getElementById('battleToast'); toast.innerText = msg; toast.style.display = 'block';
-        setTimeout(() => { toast.style.display = 'none'; }, 2000);
+        setTimeout(() => { toast.style.display = 'none'; }, ms);
     }
 
     function createPlayer() { 
@@ -3547,7 +3547,7 @@ if (isPoisonAttack && !isImmune) {
         if (chosenAtk.effect === "confuse") {
             if (parseInt(target.querySelector('.hp-box').innerText) > 0) { target.dataset.confused = "true"; showToast(targetName + " wurde verwirrt!"); }
         }
-        if (chosenAtk.effect === "sleep") showToast(targetName + " schläft ein!");
+        if (chosenAtk.effect === "sleep") showToast(targetName + " schläft ein!" + (battleType === "wild" && target.dataset.wild === "true" ? " Fangversuch erlaubt, auch ohne Mindestschaden!" : ""), 3500);
         if (isPoisonAttack) showToast(targetName + " wurde vergiftet!");
         document.getElementById('diceModal').style.display = 'none';
         endTurn();
