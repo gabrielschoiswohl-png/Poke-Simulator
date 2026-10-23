@@ -221,6 +221,8 @@
         
         #hitCounterDisplay { position: absolute; top: 10px; right: 15px; color: var(--danger); font-size: 24px; font-weight: bold; }
         .poisoned { border: 3px solid #9b59b6 !important; box-shadow: 0 0 15px #9b59b6 !important; }
+        .confuse-tag { background: #e67e22; color: white; font-size: 10px; padding: 2px 5px; border-radius: 4px; margin-left: 5px; }
+        #confuseHint { display:none; margin:6px 0 10px; padding:8px 10px; border-radius:8px; background:rgba(230,126,34,0.18); border:1px solid #e67e22; color:#ffd2a1; font-size:13px; font-weight:bold; text-align:center; }
         .poison-tag { background: #9b59b6; color: white; font-size: 10px; padding: 2px 5px; border-radius: 4px; margin-left: 5px; }
         /* ==========================================
            ⚔️ KAMPF-ARENA
@@ -446,6 +448,7 @@
     <div id="hitCounterDisplay"></div>
     <div class="dice-sub">Schadenswurf</div>
     <h3 id="diceTitle">Angriff</h3> 
+    <div id="confuseHint">😵 Verwirrt: mit dem D6 würfeln!<br>1 bis 3 = daneben (<span id="confuseDmgTxt"></span> Selbstschaden), 4 bis 6 = Treffer</div>
     <div id="hitSelection" class="hit-choice"> 
         <button class="dice-btn hit-miss" onclick="processHit('miss')">MISS</button> 
         <button class="dice-btn hit-hit" onclick="processHit('hit')">HIT</button> 
@@ -962,7 +965,7 @@ document.addEventListener('click', () => {
             atks: [
                 { s: 1, n: "Schlecker", d: 50, t: "Geist" },
                 { s: 2, n: "Schlecker ", d: 60, t: "Geist" },
-                { s: 3, n: "Konfusstrahl", d: 0, t: "Geist" },
+                { s: 3, n: "Konfusstrahl", d: 0, t: "Geist", effect: "confuse" },
                 { s: 3, n: "Schlecker  ", d: 70, t: "Geist" }
             ]
         },
@@ -971,9 +974,9 @@ document.addEventListener('click', () => {
             types: ["Geist", "Gift"], kat: 2, hp: [170, 190, 210],
             atks: [
                 { s: 1, n: "Schlecker", d: 80, t: "Geist" },
-                { s: 1, n: "Konfusstrahl", d: 0, t: "Geist" },
+                { s: 1, n: "Konfusstrahl", d: 0, t: "Geist", effect: "confuse" },
                 { s: 2, n: "Nachtnebel", d: 95, t: "Geist" },
-                { s: 3, n: "Hypnose", d: 0, t: "Psycho" },
+                { s: 3, n: "Hypnose", d: 0, t: "Psycho", effect: "sleep" },
                 { s: 3, n: "Nachtnebel ", d: 100, t: "Geist" }
             ]
         },
@@ -982,9 +985,9 @@ document.addEventListener('click', () => {
             types: ["Geist", "Gift"], kat: 3, hp: [220, 240, 260],
             atks: [
                 { s: 1, n: "Finsterfaust", d: 115, t: "Geist" },
-                { s: 1, n: "Konfusstrahl", d: 0, t: "Geist" },
+                { s: 1, n: "Konfusstrahl", d: 0, t: "Geist", effect: "confuse" },
                 { s: 2, n: "Spukball", d: 130, t: "Geist" },
-                { s: 3, n: "Hypnose", d: 0, t: "Psycho" },
+                { s: 3, n: "Hypnose", d: 0, t: "Psycho", effect: "sleep" },
                 { s: 3, n: "Spukball ", d: 140, t: "Geist" }
             ]
         },
@@ -994,7 +997,7 @@ document.addEventListener('click', () => {
             atks: [
                 { s: 1, n: "Psywelle", d: 50, t: "Psycho" },
                 { s: 2, n: "Erstauner", d: 55, t: "Geist" },
-                { s: 3, n: "Konfusstrahl", d: 0, t: "Geist" },
+                { s: 3, n: "Konfusstrahl", d: 0, t: "Geist", effect: "confuse" },
                 { s: 3, n: "Erstauner ", d: 70, t: "Geist" }
             ]
         },
@@ -1614,7 +1617,7 @@ document.addEventListener('click', () => {
     "atks": [
         { "n": "Pfund", "d": 30, "s": 1, "t": "Normal" },
         { "n": "Pfund", "d": 40, "s": 2, "t": "Normal" },
-        { "n": "Gesang", "effect": "sleep", "s": 2, "t": "Normal" },
+        { "d": 0, "n": "Gesang", "effect": "sleep", "s": 2, "t": "Normal" },
         { "n": "Pfund", "d": 50, "s": 3, "t": "Normal" }
     ]
 },
@@ -1626,7 +1629,7 @@ document.addEventListener('click', () => {
     "atks": [
         { "n": "Pfund", "d": 60, "s": 1, "t": "Normal" },
         { "n": "Pfund", "d": 70, "s": 2, "t": "Normal" },
-        { "n": "Gesang", "effect": "sleep", "s": 2, "t": "Normal" },
+        { "d": 0, "n": "Gesang", "effect": "sleep", "s": 2, "t": "Normal" },
         { "n": "Duplexhieb (5x)", "d": 30, "s": 3, "t": "Normal", "m": 5 } 
     ]
 },
@@ -1638,7 +1641,7 @@ document.addEventListener('click', () => {
     "atks": [
         { "n": "Duplexhieb (5x)", "d": 40, "s": 1, "t": "Normal", "m": 5 }, 
         { "n": "Duplexhieb (5x)", "d": 45, "s": 2, "t": "Normal", "m": 5 }, 
-        { "n": "Gesang", "effect": "sleep", "s": 2, "t": "Normal" },
+        { "d": 0, "n": "Gesang", "effect": "sleep", "s": 2, "t": "Normal" },
         { "n": "Sternenhieb", "d": 110, "s": 3, "t": "Normal" }
     ]
 },
@@ -1651,7 +1654,7 @@ document.addEventListener('click', () => {
         { "n": "Tackle", "d": 40, "s": 1, "t": "Normal" },
         { "n": "Schnabel", "d": 55, "s": 2, "t": "Flug" },
         { "n": "Konfusion", "d": 60, "s": 3, "t": "Psycho" },
-        { "n": "Hypnose", "s": 3, "t": "Psycho", "effect": "Gegner schläft" }
+        { "d": 0, "n": "Hypnose", "s": 3, "t": "Psycho", "effect": "sleep" }
     ]
 },
 "Noctuh": {
@@ -1661,7 +1664,7 @@ document.addEventListener('click', () => {
     "types": ["Normal", "Flug"],
     "atks": [
         { "n": "Konfusion", "d": 90, "s": 1, "t": "Psycho" },
-        { "n": "Hypnose", "s": 1, "t": "Psycho", "effect": "Gegner schläft" },
+        { "d": 0, "n": "Hypnose", "s": 1, "t": "Psycho", "effect": "sleep" },
         { "n": "Luftschnitt", "d": 105, "s": 2, "t": "Flug" },
         { "n": "Traumfresser", "d": 110, "s": 3, "t": "Psycho" }
     ]
@@ -1673,7 +1676,7 @@ document.addEventListener('click', () => {
         types: ["Normal"],
         atks: [
             { n: "Tackle", d: 60, s: 1, t: "Normal" },
-            { n: "Bitterkuss", s: 2, t: "Normal", effect: "confuse" },
+            { d: 0, n: "Bitterkuss", s: 2, t: "Normal", effect: "confuse" },
             { n: "Risikotackle", d: 100, s: 3, t: "Normal" },
             { n: "Antik-Kraft", d: 80, s: 3, t: "Gestein" }
         ]
@@ -1684,7 +1687,7 @@ document.addEventListener('click', () => {
         hp: [210, 130, 250],
         types: ["Normal", "Flug"],
         atks: [
-            { n: "Bitterkuss", s: 1, t: "Normal", effect: "confuse" },
+            { d: 0, n: "Bitterkuss", s: 1, t: "Normal", effect: "confuse" },
             { n: "Risikotackle", d: 110, s: 1, t: "Normal" },
             { n: "Seher", d: 120, s: 2, t: "Psycho" },
             { n: "Himmelsfeger", d: 140, s: 3, t: "Flug" }
@@ -1733,10 +1736,10 @@ document.addEventListener('click', () => {
         types: ["Normal"],
         atks: [
             { n: "Stampfer", d: 60, s: 1, t: "Normal" },
-            { n: "Hypnose", s: 1, t: "Psycho", effect: "sleep" },
+            { d: 0, n: "Hypnose", s: 1, t: "Psycho", effect: "sleep" },
             { n: "Erstauner", d: 70, s: 2, t: "Geist" },
             { n: "Bodycheck", d: 90, s: 3, t: "Normal" },
-            { n: "Konfusstrahl", s: 3, t: "Geist", effect: "confuse" }
+            { d: 0, n: "Konfusstrahl", s: 3, t: "Geist", effect: "confuse" }
         ]
     },
     "Mauzi": {
@@ -3184,7 +3187,7 @@ function renderSlot(side, pkmn, isAttacker) {
     let content = `<div class="fs-top">
         <div class="fs-sprite"><img src="${pkmn.querySelector('.pkmn-icon-small').src}"></div>
         <div class="fs-info">
-            <div class="fs-name-row"><span class="stage-tag">S${stage}</span><b class="fs-name">${name}</b>${isPoisoned ? '<span class="poison-tag">GIFT</span>' : ''}</div>
+            <div class="fs-name-row"><span class="stage-tag">S${stage}</span><b class="fs-name">${name}</b>${isPoisoned ? '<span class="poison-tag">GIFT</span>' : ''}${pkmn.dataset.confused === "true" ? '<span class="confuse-tag">VERWIRRT</span>' : ''}</div>
             <div class="fs-bar-row"><span class="fs-label">KP</span><div class="hp-bar-container"><div class="hp-bar-fill" style="width: ${percent}%; background-color: ${hpColor};"></div></div></div>
             <div class="fs-hp-text"><b>${currentHp}</b> / ${maxHp}</div>
             <div class="fs-bar-row"><span class="fs-label">EP</span><div class="fs-ep-track"><div class="fs-ep-fill" style="width:${winPercent}%;"></div></div><span class="fs-ep-text">${wins}/${winsNeeded}</span></div>
@@ -3239,7 +3242,7 @@ function renderSlot(side, pkmn, isAttacker) {
         const menu = document.getElementById('switchMenu'), grid = document.getElementById('switchGrid'); const pool = side === 1 ? poolP1 : poolP2; 
         if(pool.every(p => parseInt(p.querySelector('.hp-box').innerText) <= 0)) return; 
         menu.style.display = 'flex'; grid.innerHTML = ""; document.getElementById('cancelSwitch').style.display = isForced ? 'none' : 'block'; 
-        pool.forEach(p => { if(p === (side === 1 ? activeP1 : activeP2)) return; const hp = parseInt(p.querySelector('.hp-box').innerText); const card = document.createElement('div'); card.className = `switch-card ${hp <= 0 ? 'fainted' : ''}`; card.style.setProperty('--side', side === 1 ? '#3498db' : '#e74c3c'); card.innerHTML = pokemonCardHtml(p); if(hp > 0) { card.onclick = () => { if(side === 1) activeP1 = p; else activeP2 = p; menu.style.display = 'none'; updateArena(); }; } grid.appendChild(card); }); 
+        pool.forEach(p => { if(p === (side === 1 ? activeP1 : activeP2)) return; const hp = parseInt(p.querySelector('.hp-box').innerText); const card = document.createElement('div'); card.className = `switch-card ${hp <= 0 ? 'fainted' : ''}`; card.style.setProperty('--side', side === 1 ? '#3498db' : '#e74c3c'); card.innerHTML = pokemonCardHtml(p); if(hp > 0) { card.onclick = () => { clearConfusion(side === 1 ? activeP1 : activeP2); if(side === 1) activeP1 = p; else activeP2 = p; menu.style.display = 'none'; updateArena(); }; } grid.appendChild(card); }); 
     }
 
 function openItemMenu(side) {
@@ -3273,6 +3276,7 @@ function openItemMenu(side) {
             hpBox.innerText = Math.min(maxHp, amount);
             card.dataset.poisoned = "false";
             card.removeAttribute('data-poison-fresh');
+            clearConfusion(card);
             return "Wiederbelebt!";
         }
         // Gegengift: Vergiftung aufheben und alle dazugehörigen Datensätze löschen
@@ -3342,6 +3346,11 @@ function openItemMenu(side) {
         document.getElementById('diceModal').style.setProperty('--type', typeColors[type] || '#888');
         multiHitCount = 0; accumulatedHitsDmg = 0; totalCritBonus = 0;
         
+        const atkCard = attackerSide === 1 ? activeP1 : activeP2;
+        const confusedNow = atkCard && atkCard.dataset.confused === "true";
+        document.getElementById('confuseDmgTxt').innerText = CONFUSE_SELF_DMG;
+        document.getElementById('confuseHint').style.display = confusedNow ? 'block' : 'none';
+
         document.getElementById('diceModal').style.display='block'; 
         document.getElementById('hitSelection').style.display='flex'; 
         document.getElementById('diceSelection').style.display='none';
@@ -3369,7 +3378,22 @@ function dittoTransform(side) {
         updateArena();
     }
 }
+    // Verwirrung: Daneben = Selbstschaden, Treffer = Verwirrung vorbei
+    const CONFUSE_SELF_DMG = 20;
+    function clearConfusion(card) { if (card) card.removeAttribute('data-confused'); }
+
     function processHit(type) { 
+        const atkCard = attackerSide === 1 ? activeP1 : activeP2;
+        const wasConfused = atkCard && atkCard.dataset.confused === "true" && multiHitCount === 0;
+        if (wasConfused && type === 'miss') {
+            const hpBox = atkCard.querySelector('.hp-box');
+            hpBox.innerText = Math.max(0, parseInt(hpBox.innerText) - CONFUSE_SELF_DMG);
+            document.getElementById('diceModal').style.display = 'none';
+            showHitPopup("VERWIRRT!", atkCard.querySelector('input').value + " verletzt sich selbst (-" + CONFUSE_SELF_DMG + ")", "miss");
+            endTurn();
+            return;
+        }
+        if (wasConfused) { clearConfusion(atkCard); showToast(atkCard.querySelector('input').value + " ist nicht mehr verwirrt!"); }
         if(type === 'miss') { 
             if(multiHitCount > 0) showDiceSelection();
             else { document.getElementById('diceModal').style.display='none'; showHitPopup("MISS!", "", "miss"); endTurn(); }
@@ -3520,7 +3544,9 @@ if (isPoisonAttack && !isImmune) {
 }
     // 6. Schadensfreie Spezialattacken abfangen
     if (chosenAtk && chosenAtk.d === 0 && chosenAtk.effect !== "heal") {
-        if (chosenAtk.effect === "confuse") showToast(targetName + " wurde verwirrt!");
+        if (chosenAtk.effect === "confuse") {
+            if (parseInt(target.querySelector('.hp-box').innerText) > 0) { target.dataset.confused = "true"; showToast(targetName + " wurde verwirrt!"); }
+        }
         if (chosenAtk.effect === "sleep") showToast(targetName + " schläft ein!");
         if (isPoisonAttack) showToast(targetName + " wurde vergiftet!");
         document.getElementById('diceModal').style.display = 'none';
@@ -3890,6 +3916,7 @@ function showEvolutionChoice(choices, pkmn) {
             c.querySelector('.hp-box').innerText = c.dataset.maxhp;
             c.dataset.poisoned = "false";
             c.removeAttribute('data-poison-fresh');
+            clearConfusion(c);
         });
         if(activeP1 || activeP2) updateArena(); 
     } 
@@ -3903,6 +3930,7 @@ function closeBattle() {
             card.removeAttribute('data-poison-dmg');
             card.removeAttribute('data-poison-source-id');
             card.removeAttribute('data-poison-fresh');
+            clearConfusion(card);
         });
     }
 
