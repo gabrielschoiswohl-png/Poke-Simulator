@@ -3121,6 +3121,7 @@ let players = [], poolP1 = [], poolP2 = [], activeP1 = null, activeP2 = null, ba
 
         lastCryP1 = lastCryP2 = null;
         playBattleMusic();
+        decisionRound = false;
         activeP1 = poolP1[0]; activeP2 = poolP2[0]; attackerSide = 1; currentRound = 1;
         setTimeout(() => enforceAttackLimit(poolP1.concat(poolP2)), 300);
         document.getElementById('turnIndicator').style.display = 'block';
@@ -3289,7 +3290,7 @@ function renderSlot(side, pkmn, isAttacker) {
     </div>`; 
     
     // Spieler 1 greift zuerst an: ist sein Pokémon zu Rundenbeginn besiegt (z. B. durch Gift), muss er wechseln
-    if(currentHp <= 0 && (attackerSide !== side || side === 1)) {
+    if(currentHp <= 0 && !decisionRound && (attackerSide !== side || side === 1)) {
         content += `<div class="death-overlay">X</div>`; 
         setTimeout(() => openSwitchMenu(side, true), 1000); 
     } 
@@ -3812,6 +3813,14 @@ if (isPoisonAttack && !isImmune && !counterResult) {
     endTurn();
 }
 
+    // KP, mit denen ein Pokémon den letzten Widerstand überlebt: 20 % der max. KP, auf 5 gerundet (mindestens 5)
+    const SURVIVE_PERCENT = 0.2;
+    let decisionRound = false;
+    function survivalHp(card) {
+        const max = parseInt(card.dataset.maxhp) || 100;
+        return Math.max(5, Math.round(max * SURVIVE_PERCENT / 5) * 5);
+    }
+
     function endTurn() {
         if(attackerSide === 1) {
             attackerSide = 2;
@@ -3824,13 +3833,19 @@ if (isPoisonAttack && !isImmune && !counterResult) {
             let hp1 = parseInt(activeP1.querySelector('.hp-box').innerText);
             let hp2 = parseInt(activeP2.querySelector('.hp-box').innerText);
 
+            decisionRound = false;
             if (hp1 <= 0 && hp2 <= 0) {
+                // Wer im letzten Widerstand mehr Schaden macht, überlebt mit einem Teil seiner max. KP
                 if (damageThisRoundP2 > damageThisRoundP1) {
-                    activeP2.querySelector('.hp-box').innerText = "10";
+                    activeP2.querySelector('.hp-box').innerText = survivalHp(activeP2);
                     showToast("P2 setzt sich durch!");
                 } else if (damageThisRoundP1 > damageThisRoundP2) {
-                    activeP1.querySelector('.hp-box').innerText = "10";
+                    activeP1.querySelector('.hp-box').innerText = survivalHp(activeP1);
                     showToast("P1 setzt sich durch!");
+                } else {
+                    // Gleichstand: beide bleiben bei 0 KP und es gibt eine zusätzliche Entscheidungsrunde
+                    decisionRound = true;
+                    showToast("Exakt gleich stark! Entscheidungsrunde: beide greifen noch einmal an!", 3500);
                 }
             }
 
@@ -3840,7 +3855,7 @@ if (isPoisonAttack && !isImmune && !counterResult) {
             currentRound++; attackerSide = 1;
             updateArena();
             enforceAttackLimit([activeP1, activeP2]);
-            checkGameOver();
+            if (!decisionRound) checkGameOver(); // in der Entscheidungsrunde sind beide Pokémon noch im Rennen
         }
     }
 function getWinsNeeded(pokemonName, stage) {
@@ -4167,6 +4182,7 @@ function showEvolutionChoice(choices, pkmn) {
     } 
 function closeBattle() { 
         document.getElementById('battleOverlay').style.display = 'none'; 
+        decisionRound = false;
         playMusic('arena');
         
         // Alle Gift-Status-Flags entfernen
