@@ -146,7 +146,7 @@
         .switch-card.fainted { filter: grayscale(1); opacity: 0.45; cursor: default; }
         .item-grid .btn-action { background: linear-gradient(135deg, color-mix(in srgb, var(--c, #888) 35%, #1a1a1a), #1a1a1a 80%); border: 1px solid color-mix(in srgb, var(--c, #888) 70%, transparent); border-radius: 12px; font-size: 14px; gap: 6px; }
         .item-grid .btn-action img { width: 34px; height: 34px; margin: 0; image-rendering: pixelated; }
-        .item-grid .potion { --c: #6c5ce7; } .item-grid .super { --c: #fd9644; } .item-grid .hyper { --c: #ff78ae; } .item-grid .revive { --c: #d4ac0d; } .item-grid .max-revive { --c: #c0392b; } .item-grid .antidote { --c: #9b59b6; } .item-grid .wake { --c: #3498db; } .item-grid .herb { --c: #2ecc71; } .item-grid .tm { --c: #7f8c8d; }
+        .item-grid .potion { --c: #6c5ce7; } .item-grid .super { --c: #fd9644; } .item-grid .hyper { --c: #ff78ae; } .item-grid .revive { --c: #d4ac0d; } .item-grid .max-revive { --c: #c0392b; } .item-grid .antidote { --c: #9b59b6; } .item-grid .wake { --c: #3498db; } .item-grid .herb { --c: #2ecc71; } .item-grid .tm { --c: #7f8c8d; } .item-grid .candy { --c: #5b6cd9; }
         
         #diceModal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #333; border: 2px solid var(--win); border-radius: 15px; padding: 20px; z-index: 4000; display: none; width: 85%; max-width: 320px; text-align: center; } 
         .dice-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 15px; } 
@@ -663,6 +663,7 @@ document.addEventListener('click', () => {
     const imgTopBeleber = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/max-revive.png";
     const imgGegengift = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/antidote.png";
     const imgAufwecker = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/awakening.png";
+    const imgBonbon = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/rare-candy.png";
     const imgTM = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/tm-normal.png";
     const imgMentalkraut = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/mental-herb.png";
 
@@ -676,6 +677,7 @@ document.addEventListener('click', () => {
         { cls: 'antidote',   label: 'Gegengift',       img: imgGegengift,   type: 'antidote', amount: 0 },
         { cls: 'wake',       label: 'Aufwecker',       img: imgAufwecker,   type: 'wake',    amount: 0 },
         { cls: 'herb',       label: 'Mentalkraut',     img: imgMentalkraut, type: 'unconfuse', amount: 0 },
+        { cls: 'candy',      label: 'Sonderbonbon',    img: imgBonbon,      type: 'candy',   amount: 1 },
         { cls: 'tm',         label: 'TM',              img: imgTM,          type: 'tm',      amount: 0 }
     ];
     // TMs: Mindest-Kategorie und erlaubte Typen stehen auf der Karte (types: null = jeder Typ)
@@ -3347,6 +3349,13 @@ function openItemMenu(side) {
             if (hp <= 0) return "Pokémon ist bereits besiegt!";
             if (card.dataset.asleep !== "true") return "Pokémon schläft nicht!";
         }
+        if (type === 'candy') {
+            if (hp <= 0) return "Pokémon ist bereits besiegt!";
+            const st = parseInt(card.dataset.stage) || 1, nm = card.querySelector('input').value;
+            if (!pokemonDB[nm]) return "Unbekanntes Pokémon";
+            if (card.dataset.wild === "true") return "Wilde Pokémon bekommen keine EP";
+            if (st === 3 && !evolutions[nm] && (parseInt(card.dataset.wins) || 0) >= getWinsNeeded(nm, st)) return "Pokémon ist voll entwickelt!";
+        }
         if (type === 'unconfuse') {
             if (hp <= 0) return "Pokémon ist bereits besiegt!";
             if (card.dataset.confused !== "true") return "Pokémon ist nicht verwirrt!";
@@ -3369,6 +3378,10 @@ function openItemMenu(side) {
             card.removeAttribute('data-poison-fresh');
             clearConfusion(card);
             return "Wiederbelebt!";
+        }
+        if (type === 'candy') {
+            addWins(card, amount);
+            return card.querySelector('input').value + " bekommt " + amount + " EP!";
         }
         if (type === 'wake') {
             card.removeAttribute('data-asleep');
@@ -3864,7 +3877,6 @@ function getWinsNeeded(pokemonName, stage) {
             const pkmn = pickEpWinner(active, opp);
             const myHpBox = pkmn.querySelector('.hp-box');
             if (pkmn !== active) showToast(pkmn.querySelector('input').value + " bekommt die EP (meisten Schaden)!");
-            let s = parseInt(pkmn.dataset.stage);
             const curName = pkmn.querySelector('input').value;
 
             // Außenseiter-Sieg: höhere Kat. besiegt und mindestens die Hälfte der KP selbst abgezogen
@@ -3876,6 +3888,16 @@ function getWinsNeeded(pokemonName, stage) {
                 winGain = 2;
                 setTimeout(() => showToast("Außenseiter-Sieg! +2 EP"), pkmn !== active ? 2100 : 0);
             }
+            addWins(pkmn, winGain);
+        }
+    });
+}
+
+// Gibt einem Pokémon Siege (EP): Stufenaufstieg oder Entwicklung, wenn genug beisammen sind
+function addWins(pkmn, winGain) {
+            const myHpBox = pkmn.querySelector('.hp-box');
+            let s = parseInt(pkmn.dataset.stage);
+            const curName = pkmn.querySelector('input').value;
             let w = parseInt(pkmn.dataset.wins) + winGain;
 
             const db = pokemonDB[curName];
@@ -3931,8 +3953,6 @@ const currentWinsNeeded = getWinsNeeded(curName, s);
 
 pkmn.querySelector('.win-fill').style.width =
     Math.min(100, (w / currentWinsNeeded) * 100) + "%";
-        }
-    });
 }
 
 // Hilfsfunktion: Führt die eigentliche Entwicklung aus
