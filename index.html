@@ -141,6 +141,11 @@
         .atk-btn { background: #444; border: 1px solid #666; color: white; border-radius: 4px; padding: 5px; font-size: 11px; cursor: pointer; height: 50px; } 
         .atk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 8px; } 
         
+        #volumePanel { position: fixed; z-index: 9800; display: none; align-items: center; gap: 12px; padding: 10px 16px 10px 10px; background: rgba(22,22,28,0.96); border: 1px solid rgba(255,255,255,0.18); border-radius: 18px; box-shadow: 0 12px 32px rgba(0,0,0,0.6); backdrop-filter: blur(10px); }
+        #volMute { width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.08); font-size: 19px; cursor: pointer; flex-shrink: 0; }
+        #volMute.muted { background: rgba(231,76,60,0.35); border-color: rgba(231,76,60,0.7); }
+        #volSlider { width: 160px; height: 28px; accent-color: #3498db; cursor: pointer; }
+        #volPct { width: 38px; text-align: right; font-size: 13px; color: #aaa; font-variant-numeric: tabular-nums; }
         .sound-toggle { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 50%; width: 42px; height: 42px; font-size: 20px; cursor: pointer; flex-shrink: 0; }
         #victoryOverlay { position: fixed; inset: 0; z-index: 9000; background: rgba(0,0,0,0.75); display: flex; align-items: center; justify-content: center; padding: 20px; }
         .victory-box { background: rgba(22,22,28,0.97); border: 1px solid var(--side); border-radius: 22px; padding: 30px; text-align: center; width: 100%; max-width: 420px; box-shadow: 0 0 60px color-mix(in srgb, var(--side) 40%, transparent); animation: victoryPop 0.5s ease-out; }
@@ -319,7 +324,7 @@
 <div style="display: flex; justify-content: center; gap: 10px; margin: 15px; padding: 10px; background: #2d2d2d; border-radius: 12px; border: 1px solid #444;">
     <button onclick="saveBattleState()" style="background: #27ae60; color: white; padding: 10px 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; flex: 1; max-width: 150px;">💾 Speichern</button>
     <button onclick="loadBattleState()" style="background: #2980b9; color: white; padding: 10px 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; flex: 1; max-width: 150px;">📂 Laden</button>
-    <button class="sound-toggle" onclick="toggleSound()" title="Ton an/aus">🔊</button>
+    <button class="sound-toggle" onclick="openVolumePanel(event)" title="Lautstärke">🔊</button>
 </div>
 <div id="board" class="grid"></div> 
 <div class="battle-start-bar">
@@ -335,7 +340,7 @@
 <div id="battleOverlay"> 
     <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 5px;"> 
         <h2 style="margin:0; color:var(--win);">ARENA</h2> 
-        <div style="display:flex; align-items:center; gap:10px;"><button class="sound-toggle" onclick="toggleSound()" title="Ton an/aus">🔊</button><button onclick="closeBattle()" style="background:none; border:none; color:white; font-size:32px;">&times;</button></div> 
+        <div style="display:flex; align-items:center; gap:10px;"><button class="sound-toggle" onclick="openVolumePanel(event)" title="Lautstärke">🔊</button><button onclick="closeBattle()" style="background:none; border:none; color:white; font-size:32px;">&times;</button></div> 
     </div> 
     <div id="turnIndicator">P1 STARTET</div>
     <div id="setupView"> 
@@ -442,6 +447,12 @@
     <button onclick="resetGame()" style="flex:1; background:#333; padding:15px; border-radius:10px; color:white; border:none; font-weight:bold;">RESET</button> 
 </div> 
 
+<div id="volumePanel">
+    <button id="volMute" onclick="toggleSound()" title="Stumm schalten">🔊</button>
+    <input id="volSlider" type="range" min="0" max="100" step="1" oninput="onVolumeInput(this.value)" aria-label="Lautstärke">
+    <span id="volPct">100%</span>
+</div>
+
 <script> 
     // Übersichtsmusik: 3 aneinandergereihte Teile (ca. je 25 Min.). Teil und Sekunde werden am Gerät gemerkt,
     // damit die Musik nach einem Kampf oder Neuladen dort weiterläuft, wo sie war.
@@ -468,7 +479,9 @@
         window.addEventListener('pagehide', save);
         return {
             audio: a,
-            play() { return a.play(); },
+            play() { applyGain(a); return a.play(); },
+            set volume(v) { a.volume = v; },
+            get volume() { return a.volume; },
             pause() { a.pause(); save(); },
             set currentTime(v) { /* bewusst ignoriert: die Übersichtsmusik läuft immer weiter */ },
             get currentTime() { return a.currentTime; }
@@ -503,23 +516,78 @@ let currentTrack = null;
 let soundOn = true;
 try { soundOn = localStorage.getItem('pokeSimulatorSound') !== 'off'; } catch (e) {}
 
+// Gesamtlautstärke (0–1), wird am Gerät gemerkt
+let masterVol = 1;
+try { const v = parseFloat(localStorage.getItem('pokeSimulatorVolume')); if (v >= 0 && v <= 1) masterVol = v; } catch (e) {}
+
+// Safari auf iPad/iPhone ignoriert audio.volume. Dort läuft der Ton deshalb über einen Web-Audio-Regler.
+const volumeReadOnly = (() => { const t = new Audio(); t.volume = 0.5; return t.volume !== 0.5; })();
+let audioCtx = null, masterGain = null;
+function applyGain(track) {
+    if (!volumeReadOnly) return;
+    const a = track.audio || track;
+    try {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        if (!audioCtx) {
+            audioCtx = new AC();
+            masterGain = audioCtx.createGain();
+            masterGain.gain.value = masterVol;
+            masterGain.connect(audioCtx.destination);
+        }
+        if (audioCtx.state !== 'running') audioCtx.resume().catch(() => {});
+        if (!a._gainSource) { a._gainSource = audioCtx.createMediaElementSource(a); a._gainSource.connect(masterGain); }
+    } catch (e) {}
+}
+['touchstart', 'click'].forEach(ev => document.addEventListener(ev, () => { if (audioCtx && audioCtx.state !== 'running') audioCtx.resume().catch(() => {}); }, true));
+// Lautstärke eines Sounds: auf dem iPad regelt der Web-Audio-Regler, sonst audio.volume
+function vol(base = 1) { return volumeReadOnly ? base : base * masterVol; }
+
 function updateSoundButtons() {
-    document.querySelectorAll('.sound-toggle').forEach(b => b.innerText = soundOn ? '🔊' : '🔇');
+    const muted = !soundOn || masterVol === 0;
+    document.querySelectorAll('.sound-toggle').forEach(b => b.innerText = muted ? '🔇' : '🔊');
+    const m = document.getElementById('volMute'); if (m) { m.innerText = muted ? '🔇' : '🔊'; m.classList.toggle('muted', !soundOn); }
+    const sl = document.getElementById('volSlider'); if (sl) sl.value = Math.round(masterVol * 100);
+    const pc = document.getElementById('volPct'); if (pc) pc.innerText = Math.round(masterVol * 100) + '%';
 }
 
 function toggleSound() {
     soundOn = !soundOn;
     try { localStorage.setItem('pokeSimulatorSound', soundOn ? 'on' : 'off'); } catch (e) {}
     if (!soundOn && currentTrack) currentTrack.pause();
-    if (soundOn && currentTrack) currentTrack.play().catch(() => {});
+    if (soundOn && currentTrack) { currentTrack.volume = vol(1); applyGain(currentTrack); currentTrack.play().catch(() => {}); }
     updateSoundButtons();
 }
+
+function onVolumeInput(v) {
+    masterVol = Math.max(0, Math.min(1, v / 100));
+    try { localStorage.setItem('pokeSimulatorVolume', masterVol); } catch (e) {}
+    if (masterGain) masterGain.gain.value = masterVol;
+    if (currentTrack) currentTrack.volume = vol(1);
+    if (masterVol > 0 && !soundOn) toggleSound(); else updateSoundButtons();
+}
+
+// Regler-Fenster direkt unter dem angetippten Sound-Symbol
+function openVolumePanel(ev) {
+    const panel = document.getElementById('volumePanel');
+    if (panel.style.display === 'flex') { panel.style.display = 'none'; return; }
+    updateSoundButtons();
+    panel.style.display = 'flex';
+    const r = ev.currentTarget.getBoundingClientRect();
+    panel.style.top = (r.bottom + 8) + 'px';
+    panel.style.left = Math.max(8, Math.min(window.innerWidth - panel.offsetWidth - 8, r.right - panel.offsetWidth)) + 'px';
+}
+document.addEventListener('click', e => {
+    const panel = document.getElementById('volumePanel');
+    if (panel && panel.style.display === 'flex' && !panel.contains(e.target) && !e.target.closest('.sound-toggle')) panel.style.display = 'none';
+});
 
 // Spielt einen Sound aus dem Ordner "sounds" ab (z. B. playSound('cries/25.mp3'))
 function playSound(file, volume = 1) {
     if (!soundOn) return;
     const a = new Audio('sounds/' + file);
-    a.volume = volume;
+    a.volume = vol(volume);
+    applyGain(a);
     a.play().catch(() => {});
 }
 
@@ -537,7 +605,9 @@ function playMusic(trackName) {
         currentTrack.currentTime = 0;
     }
     currentTrack = audioTracks[trackName];
+    if (currentTrack) currentTrack.volume = vol(1);
     if (currentTrack && soundOn) {
+        applyGain(currentTrack);
         currentTrack.play().catch(err => console.log("iPad wartet auf Berührung des Bildschirms..."));
     }
 }
@@ -3638,8 +3708,8 @@ function showEvolutionAnimation(oldName, oldIcon, newName, newIcon, pkmn) {
 
     // Entwicklungsmusik nur während der Animation
     const evoMusic = new Audio('sounds/entwicklung.mp3');
-    evoMusic.volume = 0.8;
-    if (soundOn) evoMusic.play().catch(() => {});
+    evoMusic.volume = vol(0.8);
+    if (soundOn) { applyGain(evoMusic); evoMusic.play().catch(() => {}); }
 
     // Phase 1: kurz das alte Pokémon zeigen, dann ca. 16 Sekunden lang zwischen alt und neu wechseln
     // (als weiße Silhouette), erst langsam, dann immer schneller
