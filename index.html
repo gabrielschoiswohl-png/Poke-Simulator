@@ -50,7 +50,9 @@
     box-sizing: border-box;
 }
         .team-ctrl { display: flex; gap: 8px; margin-top: 12px; } 
-        .btn-add-pkmn, .btn-team-heal { flex: 1; border: none; padding: 10px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 11px; color: white; } 
+        .btn-team-items { background: #6c5ce7; display: flex; align-items: center; justify-content: center; gap: 5px; }
+        .btn-team-items img { width: 18px; height: 18px; image-rendering: pixelated; }
+        .btn-add-pkmn, .btn-team-heal, .btn-team-items { flex: 1; border: none; padding: 10px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 11px; color: white; } 
         .btn-add-pkmn { background: #3498db; } 
         .btn-team-heal { background: #27ae60; } 
         .del-btn { position: absolute; top: 5px; right: 5px; background: rgba(231, 76, 60, 0.2); color: #e74c3c; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; width: 22px; height: 22px; font-size: 14px; z-index: 10; display: flex; align-items: center; justify-content: center; } 
@@ -131,7 +133,7 @@
         .btn-switch-arena { background: #2980b9; } 
         .btn-item-arena { background: var(--success); }
 
-        #switchMenu, #itemMenu { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 5000; display: none; flex-direction: column; padding: 20px; box-sizing: border-box; } 
+        #switchMenu, #itemMenu, #ovItemMenu { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 5000; display: none; flex-direction: column; padding: 20px; box-sizing: border-box; } 
         .switch-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; } 
         .switch-card { --side: #3498db; background: linear-gradient(135deg, color-mix(in srgb, var(--side) 35%, #1a1a1a), #1a1a1a 80%); padding: 15px; border-radius: 12px; text-align: center; border: 1px solid color-mix(in srgb, var(--side) 70%, transparent); cursor: pointer; font-weight: bold; }
         .switch-card { display: flex; align-items: center; gap: 12px; text-align: left; }
@@ -139,10 +141,11 @@
         .sw-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
         .sw-name { font-size: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .switch-card .fs-hp-text b { font-size: 18px; }
+        .switch-card.disabled { filter: grayscale(1); opacity: 0.45; }
         .switch-card.fainted { filter: grayscale(1); opacity: 0.45; cursor: default; }
-        #itemGrid .btn-action { background: linear-gradient(135deg, color-mix(in srgb, var(--c, #888) 35%, #1a1a1a), #1a1a1a 80%); border: 1px solid color-mix(in srgb, var(--c, #888) 70%, transparent); border-radius: 12px; font-size: 14px; gap: 6px; }
-        #itemGrid .btn-action img { width: 34px; height: 34px; margin: 0; image-rendering: pixelated; }
-        #itemGrid .potion { --c: #6c5ce7; } #itemGrid .super { --c: #fd9644; } #itemGrid .hyper { --c: #ff78ae; } #itemGrid .revive { --c: #d4ac0d; } #itemGrid .max-revive { --c: #c0392b; } #itemGrid .antidote { --c: #9b59b6; }
+        .item-grid .btn-action { background: linear-gradient(135deg, color-mix(in srgb, var(--c, #888) 35%, #1a1a1a), #1a1a1a 80%); border: 1px solid color-mix(in srgb, var(--c, #888) 70%, transparent); border-radius: 12px; font-size: 14px; gap: 6px; }
+        .item-grid .btn-action img { width: 34px; height: 34px; margin: 0; image-rendering: pixelated; }
+        .item-grid .potion { --c: #6c5ce7; } .item-grid .super { --c: #fd9644; } .item-grid .hyper { --c: #ff78ae; } .item-grid .revive { --c: #d4ac0d; } .item-grid .max-revive { --c: #c0392b; } .item-grid .antidote { --c: #9b59b6; }
         
         #diceModal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #333; border: 2px solid var(--win); border-radius: 15px; padding: 20px; z-index: 4000; display: none; width: 85%; max-width: 320px; text-align: center; } 
         .dice-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 15px; } 
@@ -428,8 +431,15 @@
 
 <div id="itemMenu">
     <h2 class="menu-title" style="color: var(--success);"><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/potion.png" alt="">Items nutzen</h2>
-    <div id="itemGrid" class="btn-grid" style="grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 20px;"></div>
+    <div id="itemGrid" class="btn-grid item-grid" style="grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 20px;"></div>
     <button onclick="document.getElementById('itemMenu').style.display='none'" style="margin-top:25px; width:100%; padding:15px; background:#444; border:none; color:white; border-radius:8px;">Abbrechen</button>
+</div>
+
+<div id="ovItemMenu">
+    <h2 id="ovItemTitle" class="menu-title"></h2>
+    <div id="ovItemBody"></div>
+    <button id="ovItemBack" onclick="chooseOvItem(null)" style="display:none; margin-top:12px; width:100%; padding:14px; background:#333; color:white; border:none; border-radius:10px; font-weight:bold;">Zurück zu den Items</button>
+    <button onclick="closeOverviewItems()" style="margin-top:12px; width:100%; padding:14px; background:#444; color:white; border:none; border-radius:10px;">Abbrechen</button>
 </div>
 
 <div id="diceModal"> 
@@ -643,6 +653,16 @@ document.addEventListener('click', () => {
     const imgBeleber = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/revive.png";
     const imgTopBeleber = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/max-revive.png";
     const imgGegengift = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/antidote.png";
+
+    // Alle Items an einer Stelle: Name, Bild, Art und Wirkung
+    const ITEM_DEFS = [
+        { cls: 'potion',     label: 'Trank (+120)',    img: imgTrank,       type: 'heal',    amount: 120 },
+        { cls: 'super',      label: 'Super-T. (+200)', img: imgSuper,       type: 'heal',    amount: 200 },
+        { cls: 'hyper',      label: 'Hyper-T. (MAX)',  img: imgHyper,       type: 'heal',    amount: 9999 },
+        { cls: 'revive',     label: 'Beleber (160)',   img: imgBeleber,     type: 'revive',  amount: 160 },
+        { cls: 'max-revive', label: 'Top-Bel. (MAX)',  img: imgTopBeleber,  type: 'revive',  amount: 9999 },
+        { cls: 'antidote',   label: 'Gegengift',       img: imgGegengift,   type: 'antidote', amount: 0 }
+    ];
     const pkBallSprite = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png"; 
 
     // Farben der Typen (für die Attacken-Knöpfe in der Arena)
@@ -2869,6 +2889,7 @@ let players = [], poolP1 = [], poolP2 = [], activeP1 = null, activeP2 = null, ba
             <div class="pkmn-list"></div> 
             <div class="team-ctrl"> 
                 <button class="btn-add-pkmn" onclick="addPkmn('${id}')">+ PKMN</button> 
+                <button class="btn-team-items" onclick="openOverviewItems('${id}')"><img src="${imgTrank}">ITEMS</button> 
                 <button class="btn-team-heal" onclick="healTeam('${id}')">TEAM HEILEN</button> 
             </div>`; 
         document.getElementById('board').appendChild(col); players.push({id: id}); addPkmn(id); 
@@ -2904,29 +2925,8 @@ let players = [], poolP1 = [], poolP2 = [], activeP1 = null, activeP2 = null, ba
     function addPkmn(pid) { 
         const container = document.getElementById(pid).querySelector('.pkmn-list'); const card = document.createElement('div'); 
         card.className = 'pkmn-card'; card.dataset.stage = "1"; card.dataset.wins = "0"; card.dataset.kat = "1"; card.dataset.maxhp = "140"; card.dataset.poisoned = "false";
-        card.innerHTML = `<button class="del-btn" onclick="this.parentElement.remove()">&times;</button><div class="card-top"><div class="card-sprite"><img class="pkmn-icon-small" src="${pkBallSprite}"></div><div class="card-info"><div class="card-name-row"><span class="stage-tag">S1</span><div style="position:relative; flex-grow:1; min-width:0;"><input type="text" placeholder="Name..." oninput="showSearch(this)" class="card-name"><div class="search-results"></div></div></div><div class="card-bar-row"><span class="card-bar-label">KP</span><div class="card-hp-track"><div class="card-hp-fill"></div></div></div><div class="card-hp-text"><div class="hp-box">140</div><span class="card-hp-max">/ 140</span></div><div class="card-bar-row"><span class="card-bar-label">EP</span><div class="win-track"><div class="win-fill"></div></div><span class="card-wins-text">0/2</span></div></div></div><div class="btn-grid"><button class="btn-action potion" onclick="applyHeal(this, 120)"><img src="${imgTrank}">120</button><button class="btn-action super" onclick="applyHeal(this, 200)"><img src="${imgSuper}">200</button><button class="btn-action hyper" onclick="applyHeal(this, 9999)"><img src="${imgHyper}">MAX</button><button class="btn-action revive" onclick="applyRevive(this, 160)"><img src="${imgBeleber}">160</button><button class="btn-action max-revive" onclick="applyRevive(this, 9999)"><img src="${imgTopBeleber}">MAX</button></div>`; 
+        card.innerHTML = `<button class="del-btn" onclick="this.parentElement.remove()">&times;</button><div class="card-top"><div class="card-sprite"><img class="pkmn-icon-small" src="${pkBallSprite}"></div><div class="card-info"><div class="card-name-row"><span class="stage-tag">S1</span><div style="position:relative; flex-grow:1; min-width:0;"><input type="text" placeholder="Name..." oninput="showSearch(this)" class="card-name"><div class="search-results"></div></div></div><div class="card-bar-row"><span class="card-bar-label">KP</span><div class="card-hp-track"><div class="card-hp-fill"></div></div></div><div class="card-hp-text"><div class="hp-box">140</div><span class="card-hp-max">/ 140</span></div><div class="card-bar-row"><span class="card-bar-label">EP</span><div class="win-track"><div class="win-fill"></div></div><span class="card-wins-text">0/2</span></div></div></div>`; 
         container.appendChild(card); 
-    }
-
-    function applyHeal(btn, amount) {
-        const card = btn.closest('.pkmn-card');
-        const hpBox = card.querySelector('.hp-box');
-        const maxHp = parseInt(card.dataset.maxhp);
-        let hp = parseInt(hpBox.innerText);
-        if(hp <= 0) return showToast("Pokémon ist besiegt!");
-        hpBox.innerText = Math.min(maxHp, hp + amount);
-        if(activeP1 || activeP2) updateArena();
-    }
-
-    function applyRevive(btn, amount) {
-        const card = btn.closest('.pkmn-card');
-        const hpBox = card.querySelector('.hp-box');
-        const maxHp = parseInt(card.dataset.maxhp);
-        if(parseInt(hpBox.innerText) > 0) return showToast("Pokémon ist noch fit!");
-        hpBox.innerText = Math.min(maxHp, amount);
-        card.dataset.poisoned = "false";
-        card.removeAttribute('data-poison-fresh');
-        if(activeP1 || activeP2) updateArena();
     }
 
     function showSearch(input) { 
@@ -3228,58 +3228,111 @@ function renderSlot(side, pkmn, isAttacker) {
     } 
     slot.innerHTML = content; 
 }
+    // Karten-Ansicht eines Pokémon mit Sprite, Stufe, KP- und EP-Balken (Wechsel- und Items-Fenster)
+    function pokemonCardHtml(p) {
+        const hp = parseInt(p.querySelector('.hp-box').innerText);
+        const maxHp = parseInt(p.dataset.maxhp) || hp || 1, pct = Math.max(0, Math.min(100, hp / maxHp * 100)), stage = parseInt(p.dataset.stage) || 1, wins = parseInt(p.dataset.wins) || 0, need = getWinsNeeded(p.querySelector('input').value, stage) || 2;
+        return `<div class="sw-sprite"><img src="${p.querySelector('.pkmn-icon-small').src}"></div><div class="sw-info"><div class="fs-name-row"><span class="stage-tag">S${stage}</span><b class="sw-name">${p.querySelector('input').value}</b></div><div class="fs-bar-row"><span class="fs-label">KP</span><div class="hp-bar-container"><div class="hp-bar-fill" style="width:${pct}%; background-color:${pct < 20 ? 'var(--danger)' : pct < 50 ? '#f1c40f' : '#2ecc71'};"></div></div></div><div class="fs-hp-text"><b>${hp}</b> / ${maxHp}</div><div class="fs-bar-row"><span class="fs-label">EP</span><div class="fs-ep-track"><div class="fs-ep-fill" style="width:${Math.min(100, wins / need * 100)}%;"></div></div><span class="fs-ep-text">${wins}/${need}</span></div></div>`;
+    }
+
     function openSwitchMenu(side, isForced) { 
         const menu = document.getElementById('switchMenu'), grid = document.getElementById('switchGrid'); const pool = side === 1 ? poolP1 : poolP2; 
         if(pool.every(p => parseInt(p.querySelector('.hp-box').innerText) <= 0)) return; 
         menu.style.display = 'flex'; grid.innerHTML = ""; document.getElementById('cancelSwitch').style.display = isForced ? 'none' : 'block'; 
-        pool.forEach(p => { if(p === (side === 1 ? activeP1 : activeP2)) return; const hp = parseInt(p.querySelector('.hp-box').innerText); const card = document.createElement('div'); card.className = `switch-card ${hp <= 0 ? 'fainted' : ''}`; card.style.setProperty('--side', side === 1 ? '#3498db' : '#e74c3c'); const maxHp = parseInt(p.dataset.maxhp) || hp || 1, pct = Math.max(0, Math.min(100, hp / maxHp * 100)), stage = parseInt(p.dataset.stage) || 1, wins = parseInt(p.dataset.wins) || 0, need = getWinsNeeded(p.querySelector('input').value, stage) || 2; card.innerHTML = `<div class="sw-sprite"><img src="${p.querySelector('.pkmn-icon-small').src}"></div><div class="sw-info"><div class="fs-name-row"><span class="stage-tag">S${stage}</span><b class="sw-name">${p.querySelector('input').value}</b></div><div class="fs-bar-row"><span class="fs-label">KP</span><div class="hp-bar-container"><div class="hp-bar-fill" style="width:${pct}%; background-color:${pct < 20 ? 'var(--danger)' : pct < 50 ? '#f1c40f' : '#2ecc71'};"></div></div></div><div class="fs-hp-text"><b>${hp}</b> / ${maxHp}</div><div class="fs-bar-row"><span class="fs-label">EP</span><div class="fs-ep-track"><div class="fs-ep-fill" style="width:${Math.min(100, wins / need * 100)}%;"></div></div><span class="fs-ep-text">${wins}/${need}</span></div></div>`; if(hp > 0) { card.onclick = () => { if(side === 1) activeP1 = p; else activeP2 = p; menu.style.display = 'none'; updateArena(); }; } grid.appendChild(card); }); 
+        pool.forEach(p => { if(p === (side === 1 ? activeP1 : activeP2)) return; const hp = parseInt(p.querySelector('.hp-box').innerText); const card = document.createElement('div'); card.className = `switch-card ${hp <= 0 ? 'fainted' : ''}`; card.style.setProperty('--side', side === 1 ? '#3498db' : '#e74c3c'); card.innerHTML = pokemonCardHtml(p); if(hp > 0) { card.onclick = () => { if(side === 1) activeP1 = p; else activeP2 = p; menu.style.display = 'none'; updateArena(); }; } grid.appendChild(card); }); 
     }
 
 function openItemMenu(side) {
         const menu = document.getElementById('itemMenu'), grid = document.getElementById('itemGrid');
         menu.style.display = 'flex';
-        // HINZUGEFÜGT: Gegengift-Button (Nutzt die Bild-Variable für das übergebene Bild, z.B. imgGegengift)
-        grid.innerHTML = `
-            <button class="btn-action potion" style="min-height:80px;" onclick="applyBattleItem(${side}, 'heal', 120)"><img src="${imgTrank}">Trank (+120)</button>
-            <button class="btn-action super" style="min-height:80px;" onclick="applyBattleItem(${side}, 'heal', 200)"><img src="${imgSuper}">Super-T. (+200)</button>
-            <button class="btn-action hyper" style="min-height:80px;" onclick="applyBattleItem(${side}, 'heal', 9999)"><img src="${imgHyper}">Hyper-T. (MAX)</button>
-            <button class="btn-action revive" style="min-height:80px;" onclick="applyBattleItem(${side}, 'revive', 160)"><img src="${imgBeleber}">Beleber (160)</button>
-            <button class="btn-action max-revive" style="min-height:80px;" onclick="applyBattleItem(${side}, 'revive', 9999)"><img src="${imgTopBeleber}">Top-Bel. (MAX)</button>
-            <button class="btn-action antidote" style="min-height:80px;" onclick="applyBattleItem(${side}, 'antidote', 0)"><img src="${imgGegengift}">Gegengift</button>
-        `;
+        grid.innerHTML = ITEM_DEFS.map(d => `<button class="btn-action ${d.cls}" style="min-height:80px;" onclick="applyBattleItem(${side}, '${d.type}', ${d.amount})"><img src="${d.img}">${d.label}</button>`).join('');
+    }
+
+    // Warum ein Item bei diesem Pokémon nicht geht (null = geht)
+    function itemBlockReason(card, type) {
+        const hp = parseInt(card.querySelector('.hp-box').innerText);
+        if (type === 'heal' && hp <= 0) return "PKMN braucht Beleber!";
+        if (type === 'revive' && hp > 0) return "PKMN ist nicht besiegt!";
+        if (type === 'antidote') {
+            if (hp <= 0) return "Pokémon ist bereits besiegt!";
+            if (card.dataset.poisoned !== "true") return "Pokémon ist nicht vergiftet!";
+        }
+        return null;
+    }
+
+    // Wendet ein Item auf ein Pokémon an und gibt die Meldung zurück
+    function useItemOn(card, type, amount) {
+        const hpBox = card.querySelector('.hp-box');
+        const maxHp = parseInt(card.dataset.maxhp);
+        const hp = parseInt(hpBox.innerText);
+        if (type === 'heal') {
+            hpBox.innerText = Math.min(maxHp, hp + amount);
+            return "Geheilt!";
+        }
+        if (type === 'revive') {
+            hpBox.innerText = Math.min(maxHp, amount);
+            card.dataset.poisoned = "false";
+            card.removeAttribute('data-poison-fresh');
+            return "Wiederbelebt!";
+        }
+        // Gegengift: Vergiftung aufheben und alle dazugehörigen Datensätze löschen
+        card.dataset.poisoned = "false";
+        card.removeAttribute('data-poison-dmg');
+        card.removeAttribute('data-poison-source-id');
+        card.removeAttribute('data-poison-fresh');
+        return card.querySelector('input').value + " wurde vom Gift geheilt!";
     }
 
     function applyBattleItem(side, type, amount) {
         const pkmn = (side === 1 ? activeP1 : activeP2);
-        const hpBox = pkmn.querySelector('.hp-box');
-        const maxHp = parseInt(pkmn.dataset.maxhp);
-        let currentHp = parseInt(hpBox.innerText);
-
-        if(type === 'heal') {
-            if(currentHp <= 0) return showToast("PKMN braucht Beleber!");
-            hpBox.innerText = Math.min(maxHp, currentHp + amount);
-            showToast("Geheilt!");
-        } else if(type === 'revive') {
-            if(currentHp > 0) return showToast("PKMN ist nicht besiegt!");
-            hpBox.innerText = Math.min(maxHp, amount);
-            pkmn.dataset.poisoned = "false";
-            pkmn.removeAttribute('data-poison-fresh');
-            showToast("Wiederbelebt!");
-        } else if(type === 'antidote') {
-            // HINZUGEFÜGT: Logik für das Gegengift
-            if(currentHp <= 0) return showToast("Pokémon ist bereits besiegt!");
-            if(pkmn.dataset.poisoned !== "true") return showToast("Pokémon ist nicht vergiftet!");
-            
-            // Vergiftung aufheben und alle dazugehörigen Datensätze löschen
-            pkmn.dataset.poisoned = "false";
-            pkmn.removeAttribute('data-poison-dmg');
-            pkmn.removeAttribute('data-poison-source-id');
-            pkmn.removeAttribute('data-poison-fresh');
-            showToast(pkmn.querySelector('input').value + " wurde vom Gift geheilt!");
-        }
-        
-        document.getElementById('itemMenu').style.display = 'none'; 
+        const blocked = itemBlockReason(pkmn, type);
+        if (blocked) return showToast(blocked);
+        showToast(useItemOn(pkmn, type, amount));
+        document.getElementById('itemMenu').style.display = 'none';
         updateArena();
+    }
+
+    // Items in der Übersicht: erst das Item wählen, dann das Pokémon des Spielers
+    let ovItemPlayer = null;
+    function openOverviewItems(pid) {
+        ovItemPlayer = pid;
+        document.getElementById('ovItemMenu').style.display = 'flex';
+        chooseOvItem(null);
+    }
+    function closeOverviewItems() { document.getElementById('ovItemMenu').style.display = 'none'; }
+    function chooseOvItem(index) {
+        const title = document.getElementById('ovItemTitle'), body = document.getElementById('ovItemBody'), back = document.getElementById('ovItemBack');
+        if (index === null) {
+            title.innerHTML = `<img src="${imgTrank}" alt="">Items nutzen`;
+            title.style.color = 'var(--success)';
+            back.style.display = 'none';
+            body.innerHTML = `<div class="btn-grid item-grid" style="grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 20px;">` +
+                ITEM_DEFS.map((d, i) => `<button class="btn-action ${d.cls}" style="min-height:80px;" onclick="chooseOvItem(${i})"><img src="${d.img}">${d.label}</button>`).join('') + `</div>`;
+            return;
+        }
+        const def = ITEM_DEFS[index];
+        title.innerHTML = `<img src="${def.img}" alt="">${def.label}: wem geben?`;
+        title.style.color = 'white';
+        back.style.display = 'block';
+        const grid = document.createElement('div');
+        grid.className = 'switch-grid';
+        const col = document.getElementById(ovItemPlayer);
+        Array.from(col.querySelectorAll('.pkmn-card')).filter(c => pokemonDB[c.querySelector('input').value]).forEach(card => {
+            const reason = itemBlockReason(card, def.type);
+            const el = document.createElement('div');
+            el.className = 'switch-card' + (reason ? ' disabled' : '');
+            el.style.setProperty('--side', '#3498db');
+            el.innerHTML = pokemonCardHtml(card);
+            el.onclick = () => {
+                if (reason) return showToast(reason);
+                showToast(useItemOn(card, def.type, def.amount));
+                closeOverviewItems();
+                if (activeP1 || activeP2) updateArena();
+            };
+            grid.appendChild(el);
+        });
+        body.innerHTML = '';
+        body.appendChild(grid);
     }
 
     function triggerAtk(dmg, type, e, maxHits = 1, name = "") { 
