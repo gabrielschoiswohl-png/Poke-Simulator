@@ -3553,7 +3553,10 @@ function dittoTransform(side) {
 }
     // Verwirrung: Daneben = Selbstschaden, Treffer = Verwirrung vorbei
     const CONFUSE_SELF_DMG = 20;
-    function clearConfusion(card) { if (card) { card.removeAttribute('data-confused'); card.removeAttribute('data-asleep'); card.removeAttribute('data-counter'); } }
+    // Schaden, den jedes Pokémon einem Gegner zugefügt hat (für den Außenseiter-Bonus)
+    let cardUidCounter = 0;
+    function cardUid(card) { if (!card.dataset.uid) card.dataset.uid = 'c' + (++cardUidCounter); return card.dataset.uid; }
+    function clearConfusion(card) { if (card) { card.removeAttribute('data-dmg-by'); card.removeAttribute('data-confused'); card.removeAttribute('data-asleep'); card.removeAttribute('data-counter'); } }
 
     function processHit(type) { 
         const atkCard = attackerSide === 1 ? activeP1 : activeP2;
@@ -3725,6 +3728,11 @@ if (isPoisonAttack && !isImmune && !counterResult) {
     const hpBox = target.querySelector('.hp-box'); 
     let oldHp = parseInt(hpBox.innerText), newHp = Math.max(0, oldHp - totalDamage); 
     hpBox.innerText = newHp; 
+    if (oldHp > newHp) {
+        let by = {}; try { by = JSON.parse(target.dataset.dmgBy || '{}'); } catch (e) {}
+        const uid = cardUid(attacker); by[uid] = (by[uid] || 0) + (oldHp - newHp);
+        target.dataset.dmgBy = JSON.stringify(by);
+    }
     document.getElementById('diceModal').style.display = 'none'; 
 
     // Treffer-Meldung (Aussehen oben im Abschnitt "TREFFER-MELDUNG GESTALTEN")
@@ -3834,9 +3842,19 @@ function getWinsNeeded(pokemonName, stage) {
         const oppHp = parseInt(oppHpBox.innerText);
 
         if (myHp > 0 && oppHp <= 0) {
-            let w = parseInt(pkmn.dataset.wins) + 1;
             let s = parseInt(pkmn.dataset.stage);
             const curName = pkmn.querySelector('input').value;
+
+            // Außenseiter-Sieg: höhere Kat. besiegt und mindestens die Hälfte der KP selbst abgezogen (kein bloßes Wechseln zum Finishen)
+            let winGain = 1;
+            const ownKat = pokemonDB[curName]?.kat || 1;
+            const oppKat = pokemonDB[opp.querySelector('input').value]?.kat || 1;
+            let dealtBy = {}; try { dealtBy = JSON.parse(opp.dataset.dmgBy || '{}'); } catch (e) {}
+            if (oppKat > ownKat && (dealtBy[cardUid(pkmn)] || 0) >= (parseInt(opp.dataset.maxhp) || 0) / 2) {
+                winGain = 2;
+                showToast("Außenseiter-Sieg! +2 EP");
+            }
+            let w = parseInt(pkmn.dataset.wins) + winGain;
 
             const db = pokemonDB[curName];
 
