@@ -514,6 +514,11 @@
             set volume(v) { a.volume = v; },
             get volume() { return a.volume; },
             pause() { a.pause(); save(); },
+            // Reset: wieder ganz vorne (Teil 1, Sekunde 0) anfangen
+            restart() {
+                seekTo = 0; load(0); save();
+                if (currentTrack === overviewMusic && soundOn) { applyGain(a); a.play().catch(() => {}); }
+            },
             set currentTime(v) { /* bewusst ignoriert: die Übersichtsmusik läuft immer weiter */ },
             get currentTime() { return a.currentTime; }
         };
@@ -4235,6 +4240,7 @@ function closeBattle() {
         document.getElementById('board').innerHTML = "";
         players = [];
         for(let i=0; i<4; i++) createPlayer();
+        overviewMusic.restart();
   }
 
   function closeSaveOverlay() {
