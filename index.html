@@ -3215,7 +3215,7 @@ function renderSlot(side, pkmn, isAttacker) {
                 if (a.n === "Wandler") {
                     atks += `<button class="atk-btn" onclick="triggerAtk(0, 'Normal', event, 1, 'Wandler')">Wandler</button>`;
                 } else {
-                    atks += `<button class="atk-btn" style="--type:${typeColors[a.t] || '#888'}" onclick="triggerAtk(${a.d}, '${a.t}', event, ${a.m || 1}, '${a.n}')"><span class="atk-type">${a.t}</span><span class="atk-name">${a.n.replace(/\s*\(\d+x\)\s*$/, '')}${a.m > 1 ? `<span class="atk-multi"> (${a.m}x)</span>` : ''}</span><b class="atk-dmg">${a.d}</b></button>`;
+                    atks += `<button class="atk-btn" style="--type:${typeColors[a.t] || '#888'}" onclick="triggerAtk(${a.d}, '${a.t}', event, ${a.m || 1}, '${a.n}')"><span class="atk-type">${a.t}</span><span class="atk-name">${a.n.replace(/\s*\((?:\d+x|-\d+)\)\s*$/, '')}${a.m > 1 ? `<span class="atk-multi"> (${a.m}x)</span>` : ''}${(a.n.match(/\(-(\d+)\)/) && a.effect === 'poison') ? `<span class="atk-multi"> (-${a.n.match(/\(-(\d+)\)/)[1]})</span>` : ''}</span><b class="atk-dmg">${a.d}</b></button>`;
                 }
             });
         }
