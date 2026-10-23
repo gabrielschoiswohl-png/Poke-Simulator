@@ -3424,7 +3424,9 @@ function dittoTransform(side) {
     function showCounterUI(attacker, target) {
     // Hole den Schaden, den Woingenau zuletzt kassiert hat
     // Wir nutzen das Dataset des Angreifers, um zu sehen, was er zuletzt abbekommen hat
-    let reflectedDamage = parseInt(attacker.dataset.lastIncomingDamage) || 0;
+    // Regelbuch: Bei perfektem Chip bekommt der Gegner die Hälfte seines Attackenschadens zurück
+    let reflectedDamage = Math.floor((parseInt(attacker.dataset.lastIncomingDamage) || 0) / 2);
+    const targetKat = pokemonDB[target.querySelector('input').value]?.kat || target.dataset.kat || '?';
 
     // Erstelle ein einfaches Dialog-Overlay
     const counterOverlay = document.createElement('div');
@@ -3432,7 +3434,7 @@ function dittoTransform(side) {
     counterOverlay.innerHTML = `
         <div style="background:white; padding:20px; border:2px solid black;">
             <h3>Konter-Modus!</h3>
-            <p>War der Chip perfekt auf der Skala?</p>
+            <p>Chip genau auf Kat. ${targetKat} (Kat. des Gegners) auf der Fangskala?</p>
             <button id="btnHit">Perfekt (Reflektieren: ${reflectedDamage} Schaden)</button>
             <button id="btnMiss">Nur Abwehr</button>
         </div>
