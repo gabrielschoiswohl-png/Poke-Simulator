@@ -3,7 +3,7 @@
 // Die Werte der Karte (KP, Attacken) gelten für den Kampf, nicht die aus der Pokémon-DB.
 //
 // nr:       Nummer oben links auf der Karte (gleich der Kat. des Pokémon)
-// titel:    Titel der Karte, name: Name des Trainers
+// titel:    Titel der Karte, name: Name des Trainers (leer, wenn die Karte keinen Namen hat)
 // pokemon:  Name in der Pokémon-DB (für Bild und Typen), kat: Kat., stufe: S1 bis S3
 // hp:       KP auf der Karte
 // atks:     n = Name, die = Trefferwürfel, t = Typ, d = Schaden
@@ -33,7 +33,7 @@ const trainerCards = [
         ]
     },
     {
-        id: "alter-mann", nr: 3, titel: "Alter Mann", name: "Ein alter Mann", belohnung: "1x Hypertrank",
+        id: "alter-mann", nr: 3, titel: "Alter Mann", name: "", belohnung: "1x Hypertrank",
         pokemon: "Kingler", kat: 3, stufe: 2, hp: 230,
         atks: [
             { n: "Blubbstrahl", die: "D12", t: "Wasser", d: 95 },

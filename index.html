@@ -200,6 +200,8 @@
         .btn-start-wild { background: linear-gradient(90deg, #1e8449, #27ae60); }
         .wild-layout { display: grid; grid-template-columns: 1fr auto 1fr; gap: 18px; align-items: start; max-width: 1000px; margin: 0 auto; }
         @media (max-width: 600px) { .wild-layout { grid-template-columns: 1fr; } }
+        .trainer-box { margin-top: 10px; border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 10px 12px; background: rgba(255,255,255,0.03); }
+        .trainer-box summary { cursor: pointer; font-weight: bold; letter-spacing: 1px; font-size: 13px; color: #e74c3c; text-transform: uppercase; }
         .wild-search { width: 100%; box-sizing: border-box; background: rgba(255,255,255,0.06); border: 1px solid rgba(231,76,60,0.6); border-radius: 12px; padding: 12px 14px; color: white; font-size: 16px; outline: none; }
         .wild-results { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 6px; margin-top: 8px; max-height: 230px; overflow-y: auto; }
         .wild-result { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 6px; text-align: center; cursor: pointer; font-size: 12px; font-weight: bold; }
@@ -377,10 +379,13 @@
             <div class="setup-vs">VS</div>
             <div class="setup-side side-p2">
                 <div class="side-label">Gegner</div>
-                <input id="trainerCardSearch" class="wild-search" type="text" placeholder="🔍 Trainer-Karte suchen..." oninput="renderTrainerCardResults()" autocomplete="off" style="margin-bottom:8px;">
-                <div id="trainerCardResults" class="wild-results" style="grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); margin-bottom:8px;"></div>
-                <div id="trainerCardSelected"></div>
                 <div id="p2Choices" class="side-choices"></div>
+                <details id="trainerCardBox" class="trainer-box">
+                    <summary>Trainer-Karten</summary>
+                    <input id="trainerCardSearch" class="wild-search" type="text" placeholder="🔍 Trainer-Karte suchen..." oninput="renderTrainerCardResults()" autocomplete="off" style="margin-top:8px;">
+                    <div id="trainerCardResults" class="wild-results" style="grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); max-height:260px;"></div>
+                </details>
+                <div id="trainerCardSelected" style="margin-top:8px;"></div>
             </div>
         </div>
         <button class="setup-next" onclick="goToPkmnSelection()">Weiter zur Pokémon-Wahl &rarr;</button>
@@ -3069,6 +3074,7 @@ let players = [], poolP1 = [], poolP2 = [], activeP1 = null, activeP2 = null, ba
         poolP1 = []; poolP2 = [];
         trainerCardPick = null;
         document.getElementById('trainerCardSearch').value = "";
+        document.getElementById('trainerCardBox').open = false;
         battleType = "trainer";
         playMusic('choose');
         document.getElementById('wildSetupView').style.display='none';
@@ -3083,13 +3089,14 @@ let players = [], poolP1 = [], poolP2 = [], activeP1 = null, activeP2 = null, ba
 
     // Trainer-Karten (Ereigniskarten): Suche, Auswahl und Gegner-Pokémon aus den Kartenwerten
     let trainerCardPick = null;
+    const trainerLabel = c => c.name ? c.titel + " " + c.name : c.titel;
     function renderTrainerCardResults() {
         const q = document.getElementById('trainerCardSearch').value.trim().toLowerCase();
         const cont = document.getElementById('trainerCardResults'); cont.innerHTML = "";
         trainerCards.filter(c => !q || [c.titel, c.name, c.pokemon, c.belohnung, "kat " + c.kat].some(t => t.toLowerCase().includes(q))).slice(0, 12).forEach(c => {
             const item = document.createElement('div');
             item.className = 'wild-result' + (trainerCardPick === c ? ' selected' : '');
-            item.innerHTML = `<img src="${pokemonDB[c.pokemon]?.icon || ''}"><b>${c.titel} ${c.name}</b><br><span style="font-weight:normal; opacity:.8;">${c.pokemon} S${c.stufe} | ${c.hp} KP</span>`;
+            item.innerHTML = `<img src="${pokemonDB[c.pokemon]?.icon || ''}"><b>${trainerLabel(c)}</b><br><span style="font-weight:normal; opacity:.8;">${c.pokemon} S${c.stufe} | ${c.hp} KP</span>`;
             item.onclick = () => { trainerCardPick = (trainerCardPick === c ? null : c); renderTrainerCardResults(); renderArenaSetup(); };
             cont.appendChild(item);
         });
@@ -3110,7 +3117,7 @@ let players = [], poolP1 = [], poolP2 = [], activeP1 = null, activeP2 = null, ba
         mon.dataset.maxhp = c.hp;
         mon.querySelector('.hp-box').innerText = c.hp;
         mon.dataset.wild = "true";
-        mon.dataset.trainerName = c.titel === c.name ? c.name : (c.titel + " " + c.name);
+        mon.dataset.trainerName = trainerLabel(c);
         mon.dataset.cardAtks = JSON.stringify(c.atks.map(a => ({ n: a.n, d: a.d, s: 1, t: a.t, die: a.die })));
         return mon;
     }
@@ -3119,9 +3126,9 @@ let players = [], poolP1 = [], poolP2 = [], activeP1 = null, activeP2 = null, ba
     function renderArenaSetup() {
         renderTrainerCardResults();
         document.getElementById('trainerCardSelected').innerHTML = trainerCardPick
-            ? `<div class="player-choice selected" onclick="trainerCardPick = null; renderArenaSetup();"><span class="pc-name">${trainerCardPick.titel} ${trainerCardPick.name}</span><span class="pc-team"><img src="${pokemonDB[trainerCardPick.pokemon]?.icon || ''}"> ${trainerCardPick.pokemon} S${trainerCardPick.stufe} | ${trainerCardPick.hp} KP &times;</span></div>`
+            ? `<div class="player-choice selected" onclick="trainerCardPick = null; renderArenaSetup();"><span class="pc-name">${trainerLabel(trainerCardPick)}</span><span class="pc-team"><img src="${pokemonDB[trainerCardPick.pokemon]?.icon || ''}"> ${trainerCardPick.pokemon} S${trainerCardPick.stufe} | ${trainerCardPick.hp} KP &times;</span></div>`
             : "";
-        document.getElementById('p2Choices').style.display = trainerCardPick ? 'none' : '';
+        document.getElementById('p2Choices').style.opacity = trainerCardPick ? '0.35' : '';
         const modeSel = document.getElementById('modeSel');
         const pills = document.getElementById('modePills'); pills.innerHTML = "";
         Array.from(modeSel.options).forEach(o => {
@@ -3141,7 +3148,7 @@ let players = [], poolP1 = [], poolP2 = [], activeP1 = null, activeP2 = null, ba
                 const item = document.createElement('div');
                 item.className = 'player-choice' + (sel.value === p.id ? ' selected' : '') + (otherSel.value === p.id ? ' taken' : '');
                 item.innerHTML = `<span class="pc-name">${col.querySelector('input').value}</span><span class="pc-team">${sprites}</span>`;
-                item.onclick = () => { sel.value = p.id; renderArenaSetup(); };
+                item.onclick = () => { sel.value = p.id; if (side === 2) trainerCardPick = null; renderArenaSetup(); };
                 cont.appendChild(item);
             });
         });
@@ -4235,7 +4242,7 @@ function showEvolutionChoice(choices, pkmn) {
             setTimeout(() => {
                 let winnerName, extra = "";
                 if (card) {
-                    winnerName = p1L ? card.titel + " " + card.name : document.getElementById('p1Sel').options[document.getElementById('p1Sel').selectedIndex]?.text || "Spieler 1";
+                    winnerName = p1L ? trainerLabel(card) : document.getElementById('p1Sel').options[document.getElementById('p1Sel').selectedIndex]?.text || "Spieler 1";
                     if (!p1L) extra = "Belohnung: " + card.belohnung;
                 } else if (battleType === "wild") {
                     winnerName = p1L ? "Wildes " + poolP2[0].querySelector('input').value : document.getElementById(wildPlayerId).querySelector('input').value;
