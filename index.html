@@ -133,6 +133,7 @@
         .btn-switch-arena { background: #2980b9; } 
         .btn-item-arena { background: var(--success); }
 
+        #forgetMenu { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 9500; display: none; flex-direction: column; padding: 20px; box-sizing: border-box; overflow-y: auto; }
         #switchMenu, #itemMenu, #ovItemMenu { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 5000; display: none; flex-direction: column; padding: 20px; box-sizing: border-box; } 
         .switch-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; } 
         .switch-card { --side: #3498db; background: linear-gradient(135deg, color-mix(in srgb, var(--side) 35%, #1a1a1a), #1a1a1a 80%); padding: 15px; border-radius: 12px; text-align: center; border: 1px solid color-mix(in srgb, var(--side) 70%, transparent); cursor: pointer; font-weight: bold; }
@@ -691,8 +692,52 @@ document.addEventListener('click', () => {
         const base = card.dataset.isTransformed === "true" ? JSON.parse(card.dataset.transformedAtks) : (pokemonDB[name] ? pokemonDB[name].atks : []);
         let learned = [];
         try { learned = JSON.parse(card.dataset.tm || '[]'); } catch (e) {}
-        const replaced = learned.map(l => l.replaces);
-        return base.filter(a => !replaced.includes(a.n)).concat(learned.map(l => l.atk));
+        let forgot = [];
+        try { forgot = JSON.parse(card.dataset.forgot || '[]'); } catch (e) {}
+        const removed = learned.map(l => l.replaces).filter(Boolean).concat(forgot).map(n => n.trim());
+        return base.filter(a => !removed.includes(a.n.trim())).concat(learned.map(l => l.atk));
+    }
+
+    // Attacken, die das Pokémon gerade kennt: pro Name nur die höchste freigeschaltete Version (Leerzeichen am Ende zählen nicht)
+    function getVisibleAtks(card, stage = parseInt(card.dataset.stage) || 1) {
+        const best = {}, order = [];
+        getAtkList(card).filter(a => a.s <= stage).forEach(a => {
+            const k = a.n.trim();
+            if (!best[k]) order.push(k);
+            if (!best[k] || a.s >= best[k].s) best[k] = a;
+        });
+        return order.map(k => best[k]);
+    }
+    const MAX_ATKS = 4;
+
+    // Mehr als 4 Attacken (z. B. nach Stufenaufstieg): das Pokémon muss eine vergessen
+    function enforceAttackLimit(cards) {
+        const card = cards.find(c => c && c.dataset.wild !== "true" && pokemonDB[c.querySelector('input').value] && getVisibleAtks(c).length > MAX_ATKS);
+        if (!card) return;
+        const name = card.querySelector('input').value;
+        openForgetMenu(card, name + " kann nur " + MAX_ATKS + " Attacken. Welche soll vergessen werden?", atk => {
+            let forgot = []; try { forgot = JSON.parse(card.dataset.forgot || '[]'); } catch (e) {}
+            forgot.push(atk.n.trim());
+            card.dataset.forgot = JSON.stringify(forgot);
+            showToast(name + " hat " + atk.n.trim() + " vergessen!");
+            if (activeP1 || activeP2) updateArena();
+            enforceAttackLimit(cards);
+        });
+    }
+
+    function openForgetMenu(card, titleText, onPick) {
+        let menu = document.getElementById('forgetMenu');
+        if (!menu) { menu = document.createElement('div'); menu.id = 'forgetMenu'; document.body.appendChild(menu); }
+        menu.innerHTML = `<h2 class="menu-title" style="color:white;">${titleText}</h2><div id="forgetGrid" class="switch-grid"></div>`;
+        const grid = menu.querySelector('#forgetGrid');
+        getVisibleAtks(card).forEach(a => {
+            const el = document.createElement('div');
+            el.className = 'switch-card'; el.style.setProperty('--side', typeColors[a.t] || '#888');
+            el.innerHTML = `<div class="sw-info"><div class="fs-name-row"><b class="sw-name">${a.n.trim().replace(/\s*\((?:\d+x|-\d+|\+\d+ Crit)\)\s*$/, '')}</b></div><div class="fs-hp-text"><span style="color:${typeColors[a.t] || '#888'}">${a.t}</span> | <b>${a.d}</b> Schaden</div></div>`;
+            el.onclick = () => { menu.style.display = 'none'; onPick(a); };
+            grid.appendChild(el);
+        });
+        menu.style.display = 'flex';
     }
 
     // Warum ein Pokémon die TM nicht lernen kann (null = geht)
@@ -3068,6 +3113,7 @@ let players = [], poolP1 = [], poolP2 = [], activeP1 = null, activeP2 = null, ba
         lastCryP1 = lastCryP2 = null;
         playBattleMusic();
         activeP1 = poolP1[0]; activeP2 = poolP2[0]; attackerSide = 1; currentRound = 1;
+        setTimeout(() => enforceAttackLimit(poolP1.concat(poolP2)), 300);
         document.getElementById('turnIndicator').style.display = 'block';
         document.getElementById('pkmnSelectView').style.display='none'; document.getElementById('fightView').style.display='block'; 
         updateArena(); 
@@ -3176,6 +3222,7 @@ let players = [], poolP1 = [], poolP2 = [], activeP1 = null, activeP2 = null, ba
         lastCryP1 = lastCryP2 = null;
         playBattleMusic(true);
         activeP1 = poolP1[0]; activeP2 = wild; attackerSide = 1; currentRound = 1;
+        setTimeout(() => enforceAttackLimit(poolP1), 300);
         document.getElementById('turnIndicator').style.display = 'block';
         document.getElementById('wildSetupView').style.display = 'none';
         document.getElementById('fightView').style.display = 'block';
@@ -3245,12 +3292,8 @@ function renderSlot(side, pkmn, isAttacker) {
         const atkSource = getAtkList(pkmn);
 
         if (atkSource) {
-            // Gleiche Attacke mehrmals (z. B. stärkeres Donnerblitz ab S3): nur die höchste freigeschaltete Version zeigen, am Platz der alten
-            const unlocked = atkSource.filter(a => a.s <= stage);
-            const best = {};
-            unlocked.forEach(a => { if (!best[a.n] || a.s >= best[a.n].s) best[a.n] = a; });
-            const shownAtks = [];
-            unlocked.forEach(a => { if (!shownAtks.includes(best[a.n])) shownAtks.push(best[a.n]); });
+            // Gleiche Attacke mehrmals (z. B. stärkeres Donnerblitz ab S3): nur die höchste freigeschaltete Version zeigen
+            const shownAtks = getVisibleAtks(pkmn, parseInt(stage));
             shownAtks.forEach(a => {
                 // NEU: Wandler nutzt triggerAtk, damit das Würfel-Menü erscheint
                 if (a.n === "Wandler") {
@@ -3425,33 +3468,33 @@ function openItemMenu(side) {
             const el = document.createElement('div');
             el.className = 'switch-card' + (reason ? ' disabled' : ''); el.style.setProperty('--side', '#3498db');
             el.innerHTML = pokemonCardHtml(card) + (reason ? `<div class="fs-hp-text" style="font-size:11px; color:#e67e22;">${reason}</div>` : '');
-            el.onclick = () => reason ? showToast(reason) : showTmReplace(card, i);
+            el.onclick = () => reason ? showToast(reason) : (getVisibleAtks(card).length < MAX_ATKS ? learnTm(card, i, null) : showTmReplace(card, i));
             grid.appendChild(el);
         });
     }
     function showTmReplace(card, i) {
         const tm = TM_DEFS[i], name = card.querySelector('input').value, stage = parseInt(card.dataset.stage) || 1;
         const grid = tmSetStep(`<img src="${tmImg(tm)}" alt="">${name}: welche Attacke ersetzen?`, true);
-        // wie in der Arena: pro Attackenname nur die höchste freigeschaltete Version
-        const best = {};
-        getAtkList(card).filter(a => a.s <= stage).forEach(a => { if (!best[a.n] || a.s >= best[a.n].s) best[a.n] = a; });
-        Object.values(best).forEach(a => {
+        getVisibleAtks(card).forEach(a => {
             const el = document.createElement('div');
             el.className = 'switch-card'; el.style.setProperty('--side', typeColors[a.t] || '#888');
             el.innerHTML = `<div class="sw-info"><div class="fs-name-row"><b class="sw-name">${a.n.replace(/\s*\((?:\d+x|-\d+|\+\d+ Crit)\)\s*$/, '')}</b></div><div class="fs-hp-text"><span style="color:${typeColors[a.t] || '#888'}">${a.t}</span> | <b>${a.d}</b> Schaden</div></div>`;
-            el.onclick = () => {
-                let learned = []; try { learned = JSON.parse(card.dataset.tm || '[]'); } catch (e) {}
-                // eine früher per TM gelernte Attacke wird einfach überschrieben
-                const prev = learned.find(l => l.atk.n === a.n);
-                learned = learned.filter(l => l.atk.n !== a.n);
-                learned.push({ tm: tm.id, replaces: prev ? prev.replaces : a.n, atk: tm.atk });
-                card.dataset.tm = JSON.stringify(learned);
-                showToast(name + " hat " + tm.atk.n + " gelernt (statt " + a.n + ")!");
-                closeOverviewItems();
-                if (activeP1 || activeP2) updateArena();
-            };
+            el.onclick = () => learnTm(card, i, a);
             grid.appendChild(el);
         });
+    }
+    // Attacke lernen: ersetzt a, bei freiem Platz (weniger als 4 Attacken) ohne Ersetzen
+    function learnTm(card, i, a) {
+        const tm = TM_DEFS[i], name = card.querySelector('input').value;
+        let learned = []; try { learned = JSON.parse(card.dataset.tm || '[]'); } catch (e) {}
+        // eine früher per TM gelernte Attacke wird einfach überschrieben
+        const prev = a ? learned.find(l => l.atk.n === a.n) : null;
+        if (a) learned = learned.filter(l => l.atk.n !== a.n);
+        learned.push({ tm: tm.id, replaces: a ? (prev ? prev.replaces : a.n) : null, atk: tm.atk });
+        card.dataset.tm = JSON.stringify(learned);
+        showToast(name + " hat " + tm.atk.n + " gelernt" + (a ? " (statt " + a.n.trim() + ")" : "") + "!");
+        closeOverviewItems();
+        if (activeP1 || activeP2) updateArena();
     }
 
     function triggerAtk(dmg, type, e, maxHits = 1, name = "") { 
@@ -3751,6 +3794,7 @@ if (isPoisonAttack && !isImmune && !counterResult) {
             damageThisRoundP1 = 0; damageThisRoundP2 = 0;
             currentRound++; attackerSide = 1;
             updateArena();
+            enforceAttackLimit([activeP1, activeP2]);
             checkGameOver();
         }
     }
@@ -3877,6 +3921,7 @@ function performEvolution(nextName, pkmn) {
     pkmn.querySelector('input').value = nextName;
     pkmn.querySelector('.pkmn-icon-small').src = nd.icon;
     pkmn.dataset.kat = nd.kat;
+    pkmn.removeAttribute('data-forgot');
     pkmn.dataset.stage = "1";
     pkmn.dataset.wins = "0";
     // Fehlende KP bleiben erhalten (wie bei den Stufenaufstiegen), mindestens 1 KP
@@ -4087,6 +4132,7 @@ function closeBattle() {
                     kat: card.dataset.kat,
                     poisoned: card.dataset.poisoned,
                     tm: card.dataset.tm || "",
+                    forgot: card.dataset.forgot || "",
                     icon: card.querySelector('.pkmn-icon-small').src
                 }))
             }))
@@ -4114,6 +4160,7 @@ function closeBattle() {
                 card.dataset.kat = data.kat;
                 card.dataset.poisoned = data.poisoned || "false";
                 if (data.tm) card.dataset.tm = data.tm;
+                if (data.forgot) card.dataset.forgot = data.forgot;
                 card.querySelector('.pkmn-icon-small').src = data.icon;
                 card.querySelector('.stage-tag').innerText = "S" + data.stage;
                 const winsNeeded = getWinsNeeded(data.name, parseInt(data.stage)) || 2;
