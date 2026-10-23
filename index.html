@@ -3570,7 +3570,8 @@ function getWinsNeeded(pokemonName, stage) {
     if (categoryJump >= 2) wins = [1, 2, 4];      // überspringt eine Kategorie, z. B. Evoli, Karpador: 7 Siege
     else if (ownKat === 1) wins = [1, 1, 2];      // Kat 1 → 2: 4 Siege
     else if (ownKat === 2) wins = [1, 2, 2];      // Kat 2 → 3: 5 Siege
-    else wins = [2, 3, 2];                        // Kat 3 und 4: 2 + 3 Siege bis S3
+    else if (nextKats.length) wins = [2, 2, 2];   // Kat 3/4 mit Entwicklung (Rihorn, Onix): 6 Siege
+    else wins = [2, 3, 2];                        // Kat 3 und 4 ohne Entwicklung: 2 + 3 Siege bis S3
 
     return wins[stage - 1] ?? 2;
 }
