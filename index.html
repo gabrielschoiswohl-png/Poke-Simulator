@@ -134,6 +134,11 @@
         #switchMenu, #itemMenu { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 5000; display: none; flex-direction: column; padding: 20px; box-sizing: border-box; } 
         .switch-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; } 
         .switch-card { --side: #3498db; background: linear-gradient(135deg, color-mix(in srgb, var(--side) 35%, #1a1a1a), #1a1a1a 80%); padding: 15px; border-radius: 12px; text-align: center; border: 1px solid color-mix(in srgb, var(--side) 70%, transparent); cursor: pointer; font-weight: bold; }
+        .switch-card { display: flex; align-items: center; gap: 12px; text-align: left; }
+        .sw-sprite img { width: 72px; height: 72px; object-fit: contain; image-rendering: pixelated; }
+        .sw-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+        .sw-name { font-size: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .switch-card .fs-hp-text b { font-size: 18px; }
         .switch-card.fainted { filter: grayscale(1); opacity: 0.45; cursor: default; }
         #itemGrid .btn-action { background: linear-gradient(135deg, color-mix(in srgb, var(--c, #888) 35%, #1a1a1a), #1a1a1a 80%); border: 1px solid color-mix(in srgb, var(--c, #888) 70%, transparent); border-radius: 12px; font-size: 14px; gap: 6px; }
         #itemGrid .btn-action img { width: 34px; height: 34px; margin: 0; image-rendering: pixelated; }
@@ -3227,7 +3232,7 @@ function renderSlot(side, pkmn, isAttacker) {
         const menu = document.getElementById('switchMenu'), grid = document.getElementById('switchGrid'); const pool = side === 1 ? poolP1 : poolP2; 
         if(pool.every(p => parseInt(p.querySelector('.hp-box').innerText) <= 0)) return; 
         menu.style.display = 'flex'; grid.innerHTML = ""; document.getElementById('cancelSwitch').style.display = isForced ? 'none' : 'block'; 
-        pool.forEach(p => { if(p === (side === 1 ? activeP1 : activeP2)) return; const hp = parseInt(p.querySelector('.hp-box').innerText); const card = document.createElement('div'); card.className = `switch-card ${hp <= 0 ? 'fainted' : ''}`; card.style.setProperty('--side', side === 1 ? '#3498db' : '#e74c3c'); card.innerHTML = `<img src="${p.querySelector('.pkmn-icon-small').src}" style="height:50px;"><br>${p.querySelector('input').value}<br>HP: ${hp}`; if(hp > 0) { card.onclick = () => { if(side === 1) activeP1 = p; else activeP2 = p; menu.style.display = 'none'; updateArena(); }; } grid.appendChild(card); }); 
+        pool.forEach(p => { if(p === (side === 1 ? activeP1 : activeP2)) return; const hp = parseInt(p.querySelector('.hp-box').innerText); const card = document.createElement('div'); card.className = `switch-card ${hp <= 0 ? 'fainted' : ''}`; card.style.setProperty('--side', side === 1 ? '#3498db' : '#e74c3c'); const maxHp = parseInt(p.dataset.maxhp) || hp || 1, pct = Math.max(0, Math.min(100, hp / maxHp * 100)), stage = parseInt(p.dataset.stage) || 1, wins = parseInt(p.dataset.wins) || 0, need = getWinsNeeded(p.querySelector('input').value, stage) || 2; card.innerHTML = `<div class="sw-sprite"><img src="${p.querySelector('.pkmn-icon-small').src}"></div><div class="sw-info"><div class="fs-name-row"><span class="stage-tag">S${stage}</span><b class="sw-name">${p.querySelector('input').value}</b></div><div class="fs-bar-row"><span class="fs-label">KP</span><div class="hp-bar-container"><div class="hp-bar-fill" style="width:${pct}%; background-color:${pct < 20 ? 'var(--danger)' : pct < 50 ? '#f1c40f' : '#2ecc71'};"></div></div></div><div class="fs-hp-text"><b>${hp}</b> / ${maxHp}</div><div class="fs-bar-row"><span class="fs-label">EP</span><div class="fs-ep-track"><div class="fs-ep-fill" style="width:${Math.min(100, wins / need * 100)}%;"></div></div><span class="fs-ep-text">${wins}/${need}</span></div></div>`; if(hp > 0) { card.onclick = () => { if(side === 1) activeP1 = p; else activeP2 = p; menu.style.display = 'none'; updateArena(); }; } grid.appendChild(card); }); 
     }
 
 function openItemMenu(side) {
