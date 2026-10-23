@@ -3554,13 +3554,26 @@ function dittoTransform(side) {
     // Verwirrung: Daneben = Selbstschaden, Treffer = Verwirrung vorbei
     const CONFUSE_SELF_DMG = 20;
     // Schaden, den jedes Pokémon einem Gegner zugefügt hat (für den Außenseiter-Bonus)
-    // Gezählt wird pro Team (Spieler): Schaden aller Pokémon eines Spielers, auch Gift und zurückgeworfener Konter-Schaden
-    function teamKey(card) { return card.closest('.player-col')?.id || 'wild'; }
+    // Gezählt wird pro Pokémon: wer dem Gegner den meisten Schaden macht (auch Gift und zurückgeworfener Konter-Schaden), bekommt die EP
+    let cardUidCounter = 0;
+    function cardUid(card) { if (!card.dataset.uid) card.dataset.uid = 'c' + (++cardUidCounter); return card.dataset.uid; }
     function addDamageRecord(victim, source, amount) {
         if (amount <= 0) return;
         let by = {}; try { by = JSON.parse(victim.dataset.dmgBy || '{}'); } catch (e) {}
-        const k = teamKey(source); by[k] = (by[k] || 0) + amount;
+        const k = cardUid(source); by[k] = (by[k] || 0) + amount;
         victim.dataset.dmgBy = JSON.stringify(by);
+    }
+    // Wer bekommt die EP für den besiegten Gegner: das noch kampffähige Pokémon des Siegerteams mit dem meisten Schaden (bei Gleichstand das aktive)
+    function pickEpWinner(active, opp) {
+        let by = {}; try { by = JSON.parse(opp.dataset.dmgBy || '{}'); } catch (e) {}
+        const team = Array.from(active.closest('.player-col')?.querySelectorAll('.pkmn-card') || [active]);
+        let best = active, bestDmg = by[cardUid(active)] || 0;
+        team.forEach(c => {
+            if (c === active || parseInt(c.querySelector('.hp-box').innerText) <= 0 || !pokemonDB[c.querySelector('input').value]) return;
+            const d = by[cardUid(c)] || 0;
+            if (d > bestDmg) { best = c; bestDmg = d; }
+        });
+        return best;
     }
     function clearConfusion(card, keepDmg) { if (card) { if (!keepDmg) card.removeAttribute('data-dmg-by'); card.removeAttribute('data-confused'); card.removeAttribute('data-asleep'); card.removeAttribute('data-counter'); } }
 
@@ -3836,27 +3849,30 @@ function getWinsNeeded(pokemonName, stage) {
     return wins[stage - 1] ?? 2;
 }
   function checkEvolutionAfterRound() {
-    [activeP1, activeP2].forEach((pkmn, idx) => {
+    [activeP1, activeP2].forEach((active, idx) => {
         const opp = (idx === 0) ? activeP2 : activeP1;
-        if (pkmn.dataset.wild === "true") return; // Wilde Pokémon steigen nicht auf
-        const myHpBox = pkmn.querySelector('.hp-box');
+        if (active.dataset.wild === "true") return; // Wilde Pokémon steigen nicht auf
         const oppHpBox = opp.querySelector('.hp-box');
 
-        const myHp = parseInt(myHpBox.innerText);
+        const myHp = parseInt(active.querySelector('.hp-box').innerText);
         const oppHp = parseInt(oppHpBox.innerText);
 
         if (myHp > 0 && oppHp <= 0) {
+            // EP bekommt das Pokémon, das dem Gegner den meisten Schaden gemacht hat
+            const pkmn = pickEpWinner(active, opp);
+            const myHpBox = pkmn.querySelector('.hp-box');
+            if (pkmn !== active) showToast(pkmn.querySelector('input').value + " bekommt die EP (meisten Schaden)!");
             let s = parseInt(pkmn.dataset.stage);
             const curName = pkmn.querySelector('input').value;
 
-            // Außenseiter-Sieg: höhere Kat. besiegt und mindestens die Hälfte der KP vom Team abgezogen (kein bloßes Finishen eines Gegners, den andere weichgeklopft haben)
+            // Außenseiter-Sieg: höhere Kat. besiegt und mindestens die Hälfte der KP selbst abgezogen
             let winGain = 1;
             const ownKat = pokemonDB[curName]?.kat || 1;
             const oppKat = pokemonDB[opp.querySelector('input').value]?.kat || 1;
             let dealtBy = {}; try { dealtBy = JSON.parse(opp.dataset.dmgBy || '{}'); } catch (e) {}
-            if (oppKat > ownKat && (dealtBy[teamKey(pkmn)] || 0) >= (parseInt(opp.dataset.maxhp) || 0) / 2) {
+            if (oppKat > ownKat && (dealtBy[cardUid(pkmn)] || 0) >= (parseInt(opp.dataset.maxhp) || 0) / 2) {
                 winGain = 2;
-                showToast("Außenseiter-Sieg! +2 EP");
+                setTimeout(() => showToast("Außenseiter-Sieg! +2 EP"), pkmn !== active ? 2100 : 0);
             }
             let w = parseInt(pkmn.dataset.wins) + winGain;
 
