@@ -173,6 +173,8 @@
 
         .battle-start-bar { position: fixed; bottom: 85px; left: 50%; transform: translateX(-50%); width: 90%; display: flex; gap: 10px; z-index: 1000; }
         .battle-start-bar button { flex: 1; padding: 18px; border-radius: 35px; color: white; font-weight: bold; font-size: 16px; letter-spacing: 0.5px; cursor: pointer; border: 1px solid rgba(255,255,255,0.4); box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+        .battle-start-bar button { display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .start-icon { height: 56px; width: auto; margin: -16px 0; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); pointer-events: none; }
         .btn-start-trainer { background: linear-gradient(90deg, #2a75bb, #c0392b); }
         .btn-start-wild { background: linear-gradient(90deg, #1e8449, #27ae60); }
         .wild-layout { display: grid; grid-template-columns: 1fr auto 1fr; gap: 18px; align-items: start; max-width: 1000px; margin: 0 auto; }
@@ -321,8 +323,8 @@
 </div>
 <div id="board" class="grid"></div> 
 <div class="battle-start-bar">
-    <button class="btn-start-trainer" onclick="openBattleSetup()">⚔️ Trainer-Duell</button>
-    <button class="btn-start-wild" onclick="openWildSetup()">🌿 Wildes Pokémon</button>
+    <button class="btn-start-trainer" onclick="openBattleSetup()"><img class="start-icon" src="images/trainer.png" alt="">Trainer-Duell</button>
+    <button class="btn-start-wild" onclick="openWildSetup()"><img class="start-icon" src="images/tauboga.png" alt="">Wildes Pokémon</button>
 </div>
 <div id="wildHolder" style="display:none;"><div class="pkmn-list"></div></div> 
 
