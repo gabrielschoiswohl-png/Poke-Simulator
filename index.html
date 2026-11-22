@@ -3475,7 +3475,31 @@ function renderSlot(side, pkmn, isAttacker) {
                 <button class="btn-item-arena" onclick="openItemMenu(${side})"><img src="${imgTrank}">Items</button>
             </div>`; 
     } 
+    // Wildes Pokémon fangen: möglich ab 50 KP oder weniger (oder wenn es schläft), es kommt mit den aktuellen KP ins Team
+    if (side === 2 && battleType === "wild" && pkmn.dataset.wild === "true" && currentHp > 0 && (currentHp <= WILD_CATCH_HP || pkmn.dataset.asleep === "true")) {
+        content += `<button class="btn-action" style="width:100%; margin-top:10px; background:#27ae60; color:white; border:none; border-radius:10px; padding:12px; font-weight:bold;" onclick="catchWild()">FANGEN (${currentHp} KP)</button>`;
+    }
     slot.innerHTML = content; 
+}
+const WILD_CATCH_HP = 50;
+function catchWild() {
+    const wild = activeP2;
+    if (battleType !== "wild" || !wild || wild.dataset.wild !== "true") return;
+    const hp = parseInt(wild.querySelector('.hp-box').innerText) || 0;
+    if (hp <= 0) return;
+    const col = document.getElementById(wildPlayerId);
+    if (!col) return;
+    addPkmn(wildPlayerId);
+    const card = col.querySelector('.pkmn-list').lastElementChild;
+    const name = wild.querySelector('input').value;
+    card.querySelector('input').value = name;
+    card.querySelector('.pkmn-icon-small').src = wild.querySelector('.pkmn-icon-small').src;
+    card.dataset.kat = wild.dataset.kat; card.dataset.stage = wild.dataset.stage; card.dataset.wins = "0";
+    card.dataset.maxhp = wild.dataset.maxhp;
+    card.querySelector('.hp-box').innerText = hp;
+    wild.querySelector('.hp-box').innerText = 0; // der Kampf ist vorbei, das wilde Pokémon gehört jetzt dem Spieler
+    playMusic('victory');
+    showVictory(col.querySelector('input').value, 1, "Gefangen: " + name + " (" + hp + " / " + card.dataset.maxhp + " KP)");
 }
     // Karten-Ansicht eines Pokémon mit Sprite, Stufe, KP- und EP-Balken (Wechsel- und Items-Fenster)
     function pokemonCardHtml(p) {
