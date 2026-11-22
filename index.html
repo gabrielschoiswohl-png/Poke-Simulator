@@ -639,7 +639,7 @@ document.addEventListener('click', e => {
 
 // Spielt einen Sound aus dem Ordner "sounds" ab (z. B. playSound('cries/25.mp3'))
 // Kurze Jingles (Heilen, Level-up) pausieren die Hintergrundmusik und sie läuft danach weiter, wie im Gameboy-Spiel
-const JINGLES = ['heilen.mp3', 'level-up.mp3'];
+const JINGLES = ['heilen.mp3', 'level-up.mp3', 'gefangen.mp3'];
 function playSound(file, volume = 1) {
     if (!soundOn) return;
     const a = new Audio('sounds/' + file);
@@ -3498,7 +3498,8 @@ function catchWild() {
     card.dataset.maxhp = wild.dataset.maxhp;
     card.querySelector('.hp-box').innerText = hp;
     wild.querySelector('.hp-box').innerText = 0; // der Kampf ist vorbei, das wilde Pokémon gehört jetzt dem Spieler
-    playMusic('victory');
+    playSound('gefangen.mp3');
+    setTimeout(() => playMusic('victory'), 2800); // erst die Fang-Melodie, dann die Siegesmusik
     showVictory(col.querySelector('input').value, 1, "Gefangen: " + name + " (" + hp + " / " + card.dataset.maxhp + " KP)");
 }
     // Karten-Ansicht eines Pokémon mit Sprite, Stufe, KP- und EP-Balken (Wechsel- und Items-Fenster)
