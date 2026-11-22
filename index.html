@@ -486,6 +486,14 @@
     <button onclick="createPlayer()" style="flex:1; background:var(--success); padding:15px; border-radius:10px; color:white; border:none; font-weight:bold;">+ SPIELER</button> 
     <button onclick="resetGame()" style="flex:1; background:#333; padding:15px; border-radius:10px; color:white; border:none; font-weight:bold;">RESET</button> 
 </div> 
+<button id="swapOpenBtn" onclick="openSwapMenu()" title="Pokémon tauschen" style="position:fixed; right:6px; bottom:6px; z-index:50; width:22px; height:22px; padding:0; font-size:12px; line-height:22px; border-radius:50%; border:none; background:rgba(255,255,255,.08); color:rgba(255,255,255,.35);">⇄</button>
+<div id="swapMenu" style="display:none; position:fixed; inset:0; z-index:9400; background:rgba(0,0,0,.8); overflow:auto; padding:16px;">
+    <div style="max-width:720px; margin:0 auto; background:#1b1b22; border-radius:14px; padding:16px; color:white;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;"><b>Pokémon tauschen</b><button onclick="closeSwapMenu()" style="background:none; border:none; color:white; font-size:22px;">&times;</button></div>
+        <div id="swapCols" style="display:flex; gap:12px; flex-wrap:wrap;"></div>
+        <button id="swapDoBtn" onclick="doSwap()" style="width:100%; margin-top:14px; padding:14px; border:none; border-radius:10px; background:var(--success); color:white; font-weight:bold;">TAUSCHEN</button>
+    </div>
+</div>
 
 <div id="volumePanel">
     <button id="volMute" onclick="toggleSound()" title="Stumm schalten">🔊</button>
@@ -3005,6 +3013,49 @@ let players = [], poolP1 = [], poolP2 = [], activeP1 = null, activeP2 = null, ba
     function showToast(msg, ms = 2000) {
         const toast = document.getElementById('battleToast'); toast.innerText = msg; toast.style.display = 'block';
         setTimeout(() => { toast.style.display = 'none'; }, ms);
+    }
+
+    // Pokémon zwischen zwei Spielern tauschen (kleiner Button unten rechts)
+    let swapSel = [{ pid: null, card: null }, { pid: null, card: null }];
+    function openSwapMenu() {
+        const ps = Array.from(document.querySelectorAll('#board .player-col'));
+        swapSel = [{ pid: ps[0]?.id || null, card: null }, { pid: ps[1]?.id || null, card: null }];
+        renderSwapMenu();
+        document.getElementById('swapMenu').style.display = 'block';
+    }
+    function closeSwapMenu() { document.getElementById('swapMenu').style.display = 'none'; }
+    function swapSetPlayer(i, pid) { swapSel[i] = { pid, card: null }; renderSwapMenu(); }
+    function swapSetCard(i, idx) {
+        const col = document.getElementById(swapSel[i].pid);
+        swapSel[i].card = col ? col.querySelectorAll('.pkmn-card')[idx] || null : null;
+        renderSwapMenu();
+    }
+    function renderSwapMenu() {
+        const ps = Array.from(document.querySelectorAll('#board .player-col'));
+        const wrap = document.getElementById('swapCols');
+        wrap.innerHTML = '';
+        [0, 1].forEach(i => {
+            const sel = swapSel[i], col = sel.pid ? document.getElementById(sel.pid) : null;
+            const cards = col ? Array.from(col.querySelectorAll('.pkmn-card')) : [];
+            const box = document.createElement('div'); box.style.cssText = 'flex:1; min-width:240px;';
+            box.innerHTML = `<select onchange="swapSetPlayer(${i}, this.value)" style="width:100%; padding:10px; border-radius:8px; margin-bottom:8px; background:#2a2a33; color:white; border:1px solid #444;">${ps.map(p => `<option value="${p.id}" ${p.id === sel.pid ? 'selected' : ''}>${p.querySelector('input').value}</option>`).join('')}</select>` +
+                cards.map((c, idx) => {
+                    const nm = c.querySelector('input').value || '?';
+                    return `<div onclick="swapSetCard(${i}, ${idx})" style="display:flex; align-items:center; gap:8px; padding:6px 8px; margin-bottom:6px; border-radius:8px; cursor:pointer; background:${c === sel.card ? 'rgba(46,204,113,.3)' : '#2a2a33'}; border:1px solid ${c === sel.card ? '#2ecc71' : '#444'};"><img src="${c.querySelector('.pkmn-icon-small').src}" style="height:34px;"><span>${nm}</span><span style="margin-left:auto; opacity:.7; font-size:12px;">S${c.dataset.stage || 1} · ${c.querySelector('.hp-box').innerText}/${c.dataset.maxhp} KP</span></div>`;
+                }).join('') || '<div style="opacity:.6;">Keine Pokémon</div>';
+            wrap.appendChild(box);
+        });
+        document.getElementById('swapDoBtn').style.opacity = (swapSel[0].card && swapSel[1].card && swapSel[0].pid !== swapSel[1].pid) ? 1 : .4;
+    }
+    function doSwap() {
+        const [a, b] = swapSel;
+        if (!a.card || !b.card) { showToast("Bitte auf beiden Seiten ein Pokémon wählen"); return; }
+        if (a.pid === b.pid) { showToast("Bitte zwei verschiedene Spieler wählen"); return; }
+        const ph = document.createElement('div');
+        a.card.replaceWith(ph); b.card.replaceWith(a.card); ph.replaceWith(b.card);
+        showToast(a.card.querySelector('input').value + " ⇄ " + b.card.querySelector('input').value + " getauscht");
+        swapSel = [{ pid: a.pid, card: null }, { pid: b.pid, card: null }];
+        renderSwapMenu();
     }
 
     function createPlayer() { 
