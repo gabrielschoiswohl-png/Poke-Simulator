@@ -3482,10 +3482,10 @@ function renderSlot(side, pkmn, isAttacker) {
     slot.innerHTML = content; 
 }
 const WILD_CATCH_HP = 50;
-function catchWild() {
+function catchWild(forceHp) {
     const wild = activeP2;
     if (battleType !== "wild" || !wild || wild.dataset.wild !== "true") return;
-    const hp = parseInt(wild.querySelector('.hp-box').innerText) || 0;
+    const hp = forceHp || parseInt(wild.querySelector('.hp-box').innerText) || 0;
     if (hp <= 0) return;
     const col = document.getElementById(wildPlayerId);
     if (!col) return;
@@ -4334,28 +4334,29 @@ function showEvolutionChoice(choices, pkmn) {
         if(p1L || p2L) { 
             const card = trainerCardPick;
             setTimeout(() => {
-                let winnerName, extra = "";
+                let winnerName, extra = "", catchable = false;
                 if (card) {
                     winnerName = p1L ? trainerLabel(card) : document.getElementById('p1Sel').options[document.getElementById('p1Sel').selectedIndex]?.text || "Spieler 1";
                     if (!p1L) extra = "Belohnung: " + card.belohnung;
                 } else if (battleType === "wild") {
                     winnerName = p1L ? "Wildes " + poolP2[0].querySelector('input').value : document.getElementById(wildPlayerId).querySelector('input').value;
+                    if (!p1L) catchable = true;
                 } else {
                     const winnerSel = document.getElementById(p1L ? 'p2Sel' : 'p1Sel');
                     winnerName = winnerSel.options[winnerSel.selectedIndex]?.text || (p1L ? "Spieler 2" : "Spieler 1");
                 }
                 playMusic('victory');
-                showVictory(winnerName, p1L ? 2 : 1, extra);
+                showVictory(winnerName, p1L ? 2 : 1, extra, catchable);
             }, Math.max(500, lastLevelUpAt + 2800 - Date.now())); // Level-up-Sound ausklingen lassen
         } 
     }
 
     // Sieger-Anzeige mit Siegesmusik
-    function showVictory(name, side, extra = "") {
+    function showVictory(name, side, extra = "", catchable = false) {
         const color = side === 1 ? '#3498db' : '#e74c3c';
         const overlay = document.createElement('div');
         overlay.id = 'victoryOverlay';
-        overlay.innerHTML = `<div class="victory-box" style="--side:${color}"><div class="victory-cup">🏆</div><div class="dice-sub">Sieger</div><div class="victory-name">${name}</div>${extra ? `<div class="dice-sub" style="margin:8px 0 14px; font-size:15px; letter-spacing:0.5px;">${extra}</div>` : ''}<button class="setup-next" onclick="document.getElementById('victoryOverlay').remove(); closeBattle();">Zurück zur Übersicht</button></div>`;
+        overlay.innerHTML = `<div class="victory-box" style="--side:${color}"><div class="victory-cup">🏆</div><div class="dice-sub">Sieger</div><div class="victory-name">${name}</div>${extra ? `<div class="dice-sub" style="margin:8px 0 14px; font-size:15px; letter-spacing:0.5px;">${extra}</div>` : ''}${catchable ? `<button class="setup-next" style="background:#27ae60; margin-bottom:10px;" onclick="document.getElementById('victoryOverlay').remove(); catchWild(survivalHp(activeP2));">Fangen (${survivalHp(activeP2)} KP)</button>` : ''}<button class="setup-next" onclick="document.getElementById('victoryOverlay').remove(); closeBattle();">${catchable ? 'Nicht fangen' : 'Zurück zur Übersicht'}</button></div>`;
         document.body.appendChild(overlay);
     }
 
